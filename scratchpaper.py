@@ -1,52 +1,25 @@
 import sqlite3
-from pdfminer.high_level import extract_text_to_fp
-from pdfminer.layout import LAParams
-from io import BytesIO
+from datetime import date
 import ccbfunctions
 
-# Specify the PDF file you want to convert to HTML
-pdf_file = '5850.pdf'
+conn = sqlite3.connect("ccbdocsinfo.db")
+cur = conn.cursor()
 
-# Create an in-memory buffer to store the HTML output
-output_buffer = BytesIO()
+# Get a list of all the Docket Numbers in the Cases table
+cases = []
+cur.execute('''SELECT DocketNumber FROM Cases''')
+for row in cur:
+    cases.append(row[0])
 
-# Convert the PDF to HTML and write the HTML to the buffer
-with open(pdf_file, 'rb') as pdf_file:
-    extract_text_to_fp(pdf_file, output_buffer, output_type='html')
+print(len(cases))
 
-# Retrieve the HTML content from the buffer
-html_content = output_buffer.getvalue().decode('utf-8')
+sample = ['22-CCB-0035', '22-CCB-0024', '22-CCB-0015', '23-CCB-0384', '23-CCB-0320', '23-CCB-0349',
+          '23-CCB-0407', '23-CCB-0409']
+trouble = ['23-CCB-0092']
 
-# Specify the HTML file where you want to save the content
-html_output_file = 'output.html'
 
-# Save the HTML content to the HTML file
-with open(html_output_file, 'w', encoding='utf-8') as html_file:
-    html_file.write(html_content)
 
-# try:
-#     conn = sqlite3.connect("ccbdocstest.db")
-#     cur = conn.cursor()
-#     print("Successfully connected to ccbdocstest.db")
-# except:
-#     print("Error connecting to ccbdocstest.db")
-
-# otas = []
-# cur.execute('SELECT DocumentNumber from Documents WHERE DocumentType LIKE "Order to Amend%"')
-# for row in cur:
-#     otas.append(row[0])
-
-# print(len(otas))
-
-# for documentnum in otas[10:11]:
-#     print(documentnum)
-#     # ccbfunctions.getdocumentpdf(documentnum)
-#     localfile = 'pdfs/' + str(documentnum) + '.pdf'
-#     output_string = StringIO()
-#     with open(localfile, 'rb') as fin:
-#         extract_text_to_fp(fin, output_string, laparams=LAParams(), output_type='html', codec=None)
-#     with open(converted_file, 'wb') as fout:
-#         fout.write(output_string.getvalue())
+cur.close()
 
 # dismissalinfolist = []
 # for documentnum in dismissals[100:150]:

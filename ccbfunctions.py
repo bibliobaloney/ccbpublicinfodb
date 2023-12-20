@@ -1,6 +1,8 @@
-import re, requests, bs4
+import re, requests, bs4, sqlite3
 from datetime import date
+from pdfminer.high_level import extract_text_to_fp
 from pdfminer.high_level import extract_text
+from io import BytesIO
 
 # Return a tuple with 6 columns of info from a CCB doc search screen URL,
 # plus a date that's a datetime object
@@ -303,3 +305,230 @@ def humandismissalinfo(documentnum, ordertext):
     reason2 = reasonsmenu[int(reasoninput2)]
     dismissalinfo = (documentnum, 1, prej, settlement, reason1, reason2)
     return dismissalinfo
+
+# Takes a document number of an OTA, gets the locally stored PDF, returns it as bs4 soup
+# This way of getting html from pdf via pdfminer.six 
+# is from https://products.documentprocessing.com/conversion/python/pdfminer.six/
+def pdftosoup(documentnum):
+    localfile = 'pdfs/' + str(documentnum) + '.pdf'
+    output_buffer = BytesIO()
+    with open(localfile, 'rb') as pdf_file:
+        extract_text_to_fp(pdf_file, output_buffer, output_type='html')
+    html_content = output_buffer.getvalue().decode('utf-8')
+    html_output_file = 'pdfs/output.html'
+    with open(html_output_file, 'w', encoding='utf-8') as html_file:
+        html_file.write(html_content)
+    htmlfilecontents = open(html_output_file, "r")
+    orderhtml = htmlfilecontents.read()
+    ordersoup = bs4.BeautifulSoup(orderhtml, 'lxml')
+    return ordersoup
+
+# Takes bs4 soup extracted from a PDF and a list of font styles, returns list of spans matching styles
+def getboldspans(ordersoup, fontstyles):
+    listofspans = ordersoup.find_all(style=fontstyles[0])
+    for nextstyle in fontstyles[1:]:
+        listofspans.extend(ordersoup.find_all(style=nextstyle))
+    return listofspans
+
+# Takes a list of spans from bs4 soup, compares it to stuff that's not reasons to amend, returns the rest
+def getlikelyreasons(boldspans):
+    notareason = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september',
+          'october', 'november', 'december', 'startinganinfringement', 'ordertoamendnoncompliant',
+          'docketnumber', 'amendclaim', 'revie', 'edit', 'savereview', 'digitalsignature', '17usc',
+          'reviewfiling', 'agree&', 'asktheboard@ccbgov', 'probonoassistance', 'compliancereview', 'pdf', 
+          'submit', 'handbook', 'attachment', 'dismissed', 'finalamendment', 'noncompliantclaim', 'ii',
+          'png', 'jpg', 'circular', 'leavetoamend', 'starting', 'portal', 'ifaforeign', 'thisisyourthird', 
+          'dkt', 'introduction', 'monday', 'https', 'caity', 'certificateofregistration', 'removalrequests', 
+          'participantconduct', 'representativeconduct', 'onlydocuments', 'whatmusiciansshould', 'chapter',
+          'respondingtoan', 'unsuitability', 'eccb', 'noncomplianceorder', 'page', 'kentucky', 'ceaseanddesist',
+          '2023', 'copyrightclaimsboard', 'ifyour', 'save', 'screenshot', 'youtube', 'youramended', 
+          'youshouldonly', '00', 'exhibita', 'exhibitb', 'filein', 'continue', 'documenttitle', 'upload', 
+          'alternatively', 'compendium', 'please', 'agentdirectory', 'declaration', 'showcause', 'publiccatalog', 
+          'docx', 'pearls', 'describe', 'digital', 'wouldyou', 'forexample',
+          '2022', '2024', '2025']
+    boldchunks = []
+    for item in boldspans:
+        itemtext = item.get_text(strip=True)
+        if '-' in itemtext:
+            itemtext = itemtext.replace('-', '—')
+        if '–' in itemtext:
+            itemtext = itemtext.replace('–', '—')
+        if len(itemtext) > 1 and '— ' in itemtext and ' — ' not in itemtext:
+            itemtext = itemtext.replace('— ', ' — ')
+        if len(itemtext) > 1 and ' —' in itemtext and ' — ' not in itemtext:
+            itemtext = itemtext.replace(' —', ' — ')
+        itemtext = itemtext.replace('  ', ' ')
+        if len(itemtext) > 0:
+            boldchunks.append(itemtext)
+    print(boldchunks)
+    while '—' in boldchunks:
+        dashloc = boldchunks.index('—')
+        prev = dashloc - 1
+        subseq = dashloc + 1
+        recombined = boldchunks[prev] + ' ' + boldchunks[dashloc] + ' ' + boldchunks[subseq]
+        boldchunks.pop(subseq)
+        boldchunks.pop(dashloc)
+        boldchunks.pop(prev)
+        boldchunks.insert(prev, recombined)
+    otareasons = []
+    for item in boldchunks:
+        boldtext = item.replace(':', '')
+        boldtext = boldtext.lstrip('— ')
+        standardized = boldtext.replace(' ', '')
+        standardized = standardized.replace('.', '')
+        standardized = standardized.lower()
+        itsareason = True
+        if standardized == 'claim' or standardized == 'representation' or standardized == 'documentation':
+            itsareason = False
+        if standardized == 'damages' or standardized == 'compliance':
+            itsareason = False
+        if 'cfr' in standardized:
+            itsareason = False
+        if boldtext == 'I.' or boldtext == 'supplemental document' or boldtext == 'supplementary documents':
+            itsareason = False
+        if boldtext == 'Wrongful activities' or boldtext == 'Issue':
+            itsareason = False
+        if boldtext.islower():
+            itsareason = False
+        if boldtext.isupper():
+            itsareason = False
+        if len(standardized) < 5:
+            itsareason = False
+        for junk in notareason:
+            if standardized.startswith(junk):
+                itsareason = False
+            if standardized.endswith(junk):
+                itsareason = False
+        if itsareason:
+            otareasons.append(boldtext)
+    return otareasons
+
+# Compares list of likely reasons to list of approved reasons, asks for user help when there's not a match
+# Returns a list of verified reasons and a list of rejected reasons
+def checkreasons(likelyreasons, allthereasons):
+    verifiedreasons = []
+    rejectedreasons = []
+    for item in likelyreasons:
+        if item in allthereasons:
+            verifiedreasons.append(item)
+        else:
+            itsakeeper = input('***"' + str(item) + '" found as a bold string. Is this a reason (y/n)? ')
+            if itsakeeper == 'y':
+                verifiedreasons.append(item)
+            elif itsakeeper == 'n':
+                rejectedreasons.append(item)
+    return verifiedreasons, rejectedreasons
+
+# Takes a document number for a final determination, returns amount (int) of damages awarded, with input if needed
+def getdamages(documentnum):
+    getdocumentpdf(documentnum)
+    localfile = 'pdfs/' + str(documentnum) + '.pdf'
+    fdtext = extract_text(localfile)
+    fdtext = fdtext.replace('\n', '')
+    fdtext = fdtext.replace('  ', ' ')
+    moneys = re.findall('\$[0-9,]+', fdtext)
+    if len(fdtext) < 1000 or len(moneys) < 2:
+        if ("Damages are neither sought nor awarded") in fdtext:
+            strdamages = str(0)
+        else:
+            print('Found these $ strings in order number', documentnum, moneys)
+            strdamages = input('Unable to determine damages. Please enter a number or "n" if no data available: ')
+    else:
+        if moneys[0] == moneys[-1]:
+            strdamages = moneys[0]
+        else:
+            print('Found these $ strings in order number', documentnum, moneys)
+            strdamages = input('Unable to determine damages. Please enter a number or "n"')
+    if strdamages == 'n':
+        damages = None
+    else:
+        strdamages = strdamages.lstrip('$')
+        strdamages = strdamages.replace(',', '')
+        damages = int(strdamages)
+    return damages
+
+#Takes a docket number and checks who's filed docs in case. Returns 1 if no respondents have filed docs, 
+#returns 0 if all respondents have filed something, else 2
+def checkdefault(docketnum):
+    conn = sqlite3.connect("ccbdocsinfo.db")
+    cur = conn.cursor()
+    cur.execute('''SELECT RespondentName from Respondents WHERE DocketNumber = ?''', (docketnum, ))
+    respondents = set()
+    for row in cur:
+        respondents.add(row[0])
+    cur.execute('''SELECT DocumentParty from Documents WHERE DocketNumber = ?''', (docketnum, ))
+    filingparties = set()
+    for row in cur:
+        filingparties.add(row[0])
+    filingrespondents = set()
+    absentees = set()
+    for resp in respondents:
+        if resp in filingparties:
+            filingrespondents.add(resp)
+        else:
+            absentees.add(resp)
+    default = None
+    if len(filingrespondents) == 0 and len(absentees) > 0:
+        default = 1
+    elif len(filingrespondents) > 0 and len(absentees) == 0:
+        default = 0
+    else:
+        defaultcheck = input("Was this a default determination? 0 for no, 1 for yes, 2 for it's complicated: ")
+        default = int(defaultcheck)
+    return default
+
+# Takes a docket number, checks the documents that have been filed, and returns a case status
+def getstatus(docketnum):
+    status = None
+    conn = sqlite3.connect("ccbdocsinfo.db")
+    cur = conn.cursor()
+    cur.execute('''SELECT FilingDate, DocumentType, DocumentNumber, DocumentTitle FROM Documents 
+                WHERE DocketNumber = ?''', (docketnum, ))
+    datesanddocs = []
+    docs = []
+    for row in cur:
+        datesanddocs.append(row)
+        docs.append(row[1])
+    fdrows = [x for x in datesanddocs if 'Final Determination' in x[1]]
+    orderrows = [x for x in datesanddocs if 'Order' in x[1]]
+    ordermatters = {'Notice of Compliance and Direction to Serve': 'Waiting for Proof of Service', 
+                    'Amended Claim': 'Waiting for Review of Amended Claim', 
+                    'Order to Amend Noncompliant Claim': 'Waiting for Amended Claim'}
+    thingstosort = [x for x in datesanddocs if x[1] in ordermatters]
+    if len(fdrows) == 1:
+        documentnum = fdrows[0][2]
+        cur.execute('''SELECT DefaultYN FROM FinalDeterminations WHERE DocumentNumber = ?''', (documentnum, ))
+        for row in cur:
+            default = row[0]
+        if default == 1:
+            status = 'Final Determination - Default'
+        else:
+            status = fdrows[0][1]
+    elif 'Order Dismissing Claim' in docs:
+        dismissalrow = [x for x in datesanddocs if x[1] == 'Order Dismissing Claim'][0]
+        documentnum = dismissalrow[2]
+        cur.execute('''SELECT WithPrejudice FROM Dismissals WHERE DocumentNumber = ?''', (documentnum, ))
+        for row in cur:
+            prejudice = row[0]
+        if prejudice == 0:
+            status = 'Dismissed Without Prejudice'
+        elif prejudice == 1:
+            status = 'Dismissed With Prejudice'
+        elif prejudice == 2:
+            status = 'Dismissed Without Prejudice; Will Become With Prejudice After Time for Reopening Elapses'
+    elif 'Scheduling Order' in docs:
+        status = 'Active Phase'
+    elif 'Proof of Service' in docs or 'Proof of Waiver' in docs:
+        status = 'Waiting for Scheduling Order'
+    elif len(thingstosort) > 0:
+        thingstosort.sort()
+        mostrecent = thingstosort[-1][1]
+        status = ordermatters[mostrecent]
+    elif 'Abeyance Order' in docs:
+        status = 'In Abeyance'
+    elif len(orderrows) > 0:
+        latest = orderrows[-1]
+        status = latest[3] + ' Filed - Failure of Payment Likely'
+    elif 'Claim' in docs:
+        status = 'Waiting for Initial Review'
+    return status

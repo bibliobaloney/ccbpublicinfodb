@@ -1,14 +1,17 @@
+#This will build the whole database from scratch, 
+#or allow you to scrap and rebuild any particular table
+
 import requests, bs4, sqlite3
 from pdfminer.high_level import extract_text
 import ccbfunctions
 
 # Connect to the db, create it if it doesn't exist yet
 try:
-    conn = sqlite3.connect("ccbdocstest.db")
+    conn = sqlite3.connect("ccbdocsinfo.db")
     cur = conn.cursor()
-    print("Successfully connected to ccbdocstest.db")
+    print("Successfully connected to ccbdocsinfo.db")
 except:
-    print("Error connecting to ccbdocstest.db")
+    print("Error connecting to ccbdocsinfo.db")
 
 #In case you're running this for the first time or decided to restructure this table    
 docsrebuild = input('Do you want to (re)build the Documents table from scratch (y/n)?')
@@ -244,7 +247,7 @@ if docsrebuild == 'y':
         conn.commit()
         print("Dissmissals table freshly created")
     except sqlite3.Error as error:
-        print("Possible error while creating Works table:", error)
+        print("Possible error while creating Dismissals table:", error)
 else:
     print('Okay, skipping drop and rebuild Dismissals')
 
@@ -288,4 +291,49 @@ cur.executemany('''INSERT OR IGNORE INTO Dismissals VALUES (?, ?, ?, ?, ?, ?)'''
 conn.commit()
 print("Dismissal info added for", cur.rowcount, "orders")
 
+#In case you're running this for the first time or decided to restructure FinalDeterminations table    
+fdsrebuild = input('Do you want to (re)build the FinalDeterminations table from scratch (y/n)?')
+if fdsrebuild == 'y':
+    cur.execute('DROP TABLE IF EXISTS FinalDeterminations')
+    try:
+        determinations_table_query = '''CREATE TABLE FinalDeterminations (DocumentNumber INTEGER UNIQUE, 
+        DefaultYN Integer, Damages INTEGER)'''
+        cur.execute(determinations_table_query)
+        conn.commit()
+        print("FinalDeterminations table freshly created")
+    except sqlite3.Error as error:
+        print("Possible error while creating FinalDeterminations table:", error)
+else:
+    print('Okay, skipping drop and rebuild FinalDeterminations')
+
+# Get a list of all the Final Determinations in the Documents table
+finaldeterminations = []
+cur.execute('''SELECT DocketNumber, DocumentNumber, DocumentType from Documents 
+            WHERE DocumentType LIKE "Final Determination%"''')
+for row in cur:
+    finaldeterminations.append(row)
+finaldeterminations.sort()
+
+fdsinfolist = []
+for fdrow in finaldeterminations:
+    documentnum = fdrow[1]
+    damages = ccbfunctions.getdamages(documentnum)
+    docketnum = fdrow[0]
+    print(docketnum)
+    isdefault = ccbfunctions.checkdefault(docketnum)
+    fdsinfolist.append((documentnum, isdefault, damages))
+
+print("Adding info about Final Determinations to database")
+cur.executemany('''INSERT OR IGNORE INTO FinalDeterminations VALUES (?, ?, ?)''', fdsinfolist)
+conn.commit()
+print("Final Determination info added for", cur.rowcount, "FDs")
+
 cur.close()
+
+print('-----------')
+print('***Database built: 7 tables created and populated with public data from the CCB docketing site***')
+print('-----------')
+print("If you want to collect reasons from Orders to Amend, next run build_otas_table.py next")
+print("WARNING: it's really time consuming and fiddly to do the first time, from scratch.")
+print("If you don't add it, update_db.py will have errors until you remove the code for it,")
+print("starting around line 185")
