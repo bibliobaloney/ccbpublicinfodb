@@ -16,7 +16,9 @@ for row in cur:
 
 reasonseries = pd.Series(data=allthereasons)
 df = reasonseries.value_counts().rename_axis('reasons').reset_index(name='counts')
-print(df)
 
 fig = px.pie(df, values='counts', names='reasons')
-fig.show()
+fig.update_layout(
+    margin=dict(l=0, r=0, t=0, b=0),
+    )
+fig.write_html("../bibliobaloney.github.io/charts/alldismissals.html", include_plotlyjs='directory')

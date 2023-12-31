@@ -144,7 +144,8 @@ def getclaimantinfo(claimsoup):
             lawfirmhook = claimsoup.find(string=re.compile('Law firm'))
             lawfirmdiv = lawfirmhook.parent.parent.find(attrs={'data-field' : 'organization'})
             claimantlawfirm = lawfirmdiv.get_text(strip=True)
-        caseclaimants.append((claimantname, claimantcityonly, stateorcountry, claimantcountry, claimantrep, claimantlawfirm))
+        caseclaimants.append((claimantname, claimantcityonly, stateorcountry, claimantcountry, claimantrep, 
+                              claimantlawfirm))
     return caseclaimants
 
 # Get info about respondents, and whether they've opted out. Returns a list of tuples
@@ -344,7 +345,7 @@ def getlikelyreasons(boldspans):
           '2023', 'copyrightclaimsboard', 'ifyour', 'save', 'screenshot', 'youtube', 'youramended', 
           'youshouldonly', '00', 'exhibita', 'exhibitb', 'filein', 'continue', 'documenttitle', 'upload', 
           'alternatively', 'compendium', 'please', 'agentdirectory', 'declaration', 'showcause', 'publiccatalog', 
-          'docx', 'pearls', 'describe', 'digital', 'wouldyou', 'forexample',
+          'docx', 'pearls', 'describe', 'digital', 'wouldyou', 'forexample', 'mp4'
           '2022', '2024', '2025']
     boldchunks = []
     for item in boldspans:
@@ -452,7 +453,8 @@ def getdamages(documentnum):
 def checkdefault(docketnum):
     conn = sqlite3.connect("ccbdocsinfo.db")
     cur = conn.cursor()
-    cur.execute('''SELECT RespondentName from Respondents WHERE DocketNumber = ?''', (docketnum, ))
+    cur.execute('''SELECT RespondentName from Respondents WHERE DocketNumber = ? AND 
+                OptedOutYN = 0''', (docketnum, ))
     respondents = set()
     for row in cur:
         respondents.add(row[0])
@@ -468,12 +470,18 @@ def checkdefault(docketnum):
         else:
             absentees.add(resp)
     default = None
+    notdefaults = ['22-CCB-0273', '23-CCB-0035', '23-CCB-0187']
     if len(filingrespondents) == 0 and len(absentees) > 0:
         default = 1
     elif len(filingrespondents) > 0 and len(absentees) == 0:
         default = 0
+    elif docketnum in notdefaults:
+        default = 0
     else:
-        defaultcheck = input("Was this a default determination? 0 for no, 1 for yes, 2 for it's complicated: ")
+        print(docketnum)
+        print('Filing respondents:', filingrespondents)
+        print('Absentees:', absentees)
+        defaultcheck = input("Was this (or will it be) a default determination? 0 for no, 1 for yes, 2 for it's complicated: ")
         default = int(defaultcheck)
     return default
 
@@ -486,9 +494,11 @@ def getstatus(docketnum):
                 WHERE DocketNumber = ?''', (docketnum, ))
     datesanddocs = []
     docs = []
+    doctitles = []
     for row in cur:
         datesanddocs.append(row)
         docs.append(row[1])
+        doctitles.append(row[3])
     fdrows = [x for x in datesanddocs if 'Final Determination' in x[1]]
     orderrows = [x for x in datesanddocs if 'Order' in x[1]]
     ordermatters = {'Notice of Compliance and Direction to Serve': 'Waiting for Proof of Service', 
@@ -515,7 +525,7 @@ def getstatus(docketnum):
         elif prejudice == 1:
             status = 'Dismissed With Prejudice'
         elif prejudice == 2:
-            status = 'Dismissed Without Prejudice; Will Become With Prejudice After Time for Reopening Elapses'
+            status = 'Settlement; prejudice pending'
     elif 'Scheduling Order' in docs:
         status = 'Active Phase'
     elif 'Proof of Service' in docs or 'Proof of Waiver' in docs:
@@ -526,9 +536,16 @@ def getstatus(docketnum):
         status = ordermatters[mostrecent]
     elif 'Abeyance Order' in docs:
         status = 'In Abeyance'
+    elif 'Order Closing Case' in doctitles:
+        status = 'Closed; failure of payment likely'
     elif len(orderrows) > 0:
         latest = orderrows[-1]
-        status = latest[3] + ' Filed - Failure of Payment Likely'
+        status = latest[3] + ' was last order filed'
     elif 'Claim' in docs:
         status = 'Waiting for Initial Review'
+    if status == 'None':
+        print('Status is None')
+        print(docketnum)
+        print(docs)
+        print(doctitles)
     return status

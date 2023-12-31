@@ -43,7 +43,7 @@ while moredocstoget == True:
 #Start adding claim info to Cases table
 print("Dropping rows with no claim available last time; Adding any new publicly available claim URL info")
 #First remove any rows previously added for cases that didn't have claims yet
-cur.execute("DELETE from Cases WHERE (ClaimAvailableYN=0 AND Status IS NULL) OR (ClaimAvailableYN=0 AND Status!='Closed')")
+cur.execute("DELETE from Cases WHERE (ClaimAvailableYN=0 AND Status IS NULL)")
 conn.commit()
 #Add Docket Number, Claim availability, and Claim URL for cases with publicly available initial claims
 caseswithclaims = []
@@ -283,7 +283,7 @@ print("Final Determination info added for", cur.rowcount, "FDs")
 
 # Get a list of cases to check statuses for
 cases = []
-cur.execute('''SELECT DocketNumber FROM Cases''')
+cur.execute('''SELECT DocketNumber FROM Cases WHERE Status NOT LIKE "Dismisse%"''')
 for row in cur:
     cases.append(row[0])
 # Collect the statuses
@@ -292,7 +292,6 @@ for case in cases:
     status = ccbfunctions.getstatus(case)
     statuslist.append((status, case))
 # Update the statuses
-
 cur.executemany('''UPDATE Cases SET Status = ? WHERE DocketNumber = ?''', statuslist)
 conn.commit()
 print("Status updated for", cur.rowcount, "dockets")

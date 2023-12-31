@@ -1,25 +1,95 @@
 import sqlite3
-from datetime import date
+import statistics
+from datetime import date, timedelta
+import pandas as pd
+from bs4 import BeautifulSoup
 import ccbfunctions
+import ccb_analysis_functions
+
 
 conn = sqlite3.connect("ccbdocsinfo.db")
 cur = conn.cursor()
 
-# Get a list of all the Docket Numbers in the Cases table
-cases = []
-cur.execute('''SELECT DocketNumber FROM Cases''')
+thirtydaysago = date.today() - timedelta(days=30)
+ccbanniversary = date.fromisoformat('2023-06-16')
+
+allreasonsall, allreasonsrecent, allreasonsfirstyear = [], [], []
+repreasonsall, repreasonsrecent, repreasonsfirstyear = [], [], []
+unrepreasonsall, unrepreasonsrecent, unrepreasonsfirstyear = [], [], []
+numotasallall, numotasallrecent, numotasallfirstyear = set(), set(), set()
+numotasrepall, numotasreprecent, numotasrepfirstyear = set(), set(), set()
+numotasunrepall, numotasunreprecent, numotasunrepfirstyear = set(), set(), set()
+allcasesall, allcasesrecent, allcasesfirstyear = set(), set(), set()
+repcasesall, repcasesrecent, repcasesfirstyear = set(), set(), set()
+unrepcasesall, unrepcasesrecent, unrepcasesfirstyear = set(), set(), set()
+
+cur.execute('''SELECT * FROM OrdersToAmend JOIN Documents USING(DocumentNumber)''')
 for row in cur:
-    cases.append(row[0])
+    reason = row[1]
+    docketnum = row[2]
+    documentnum = row[0]
+    filingdate = date.fromisoformat(row[7])
+    represented = ccb_analysis_functions.checkrepviacase(docketnum)
+    allreasonsall.append(reason)
+    numotasallall.add(documentnum)
+    allcasesall.add(docketnum)
+    if filingdate > thirtydaysago:
+        allreasonsrecent.append(reason)
+        numotasallrecent.add(documentnum)
+        allcasesrecent.add(docketnum)
+    if filingdate < ccbanniversary:
+        allreasonsfirstyear.append(reason)
+        numotasallfirstyear.add(documentnum)
+        allcasesfirstyear.add(docketnum)
+    if represented == 1:
+        repreasonsall.append(reason)
+        numotasrepall.add(documentnum)
+        repcasesall.add(docketnum)
+        if filingdate > thirtydaysago:
+            repreasonsrecent.append(reason)
+            numotasreprecent.add(documentnum)
+            repcasesrecent.add(docketnum)
+        if filingdate < ccbanniversary:
+            repreasonsfirstyear.append(reason)
+            numotasrepfirstyear.add(documentnum)
+            repcasesfirstyear.add(docketnum)
+    if represented == 0:
+        unrepreasonsall.append(reason)
+        numotasunrepall.add(documentnum)
+        unrepcasesrecent.add(docketnum)
+        if filingdate > thirtydaysago:
+            unrepreasonsrecent.append(reason)
+            numotasunreprecent.add(documentnum)
+            unrepcasesrecent.add(docketnum)
+        if filingdate < ccbanniversary:
+            unrepreasonsfirstyear.append(reason)
+            numotasunrepfirstyear.add(documentnum)
+            unrepcasesfirstyear.add(docketnum)
 
-print(len(cases))
 
-sample = ['22-CCB-0035', '22-CCB-0024', '22-CCB-0015', '23-CCB-0384', '23-CCB-0320', '23-CCB-0349',
-          '23-CCB-0407', '23-CCB-0409']
-trouble = ['23-CCB-0092']
-
-
+#Update reasons tallies info from all OTAs
+series = pd.Series(data=allreasonsall)
+reasonsfromallotasdf = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
+df = reasonsfromallotasdf[:20]
+print(df)
+print(len(allreasonsall), 'reasons total')
+print('across all, aka ', len(numotasallall), 'orders')
+print('in ', len(allcasesall), 'cases')
+# html_table = df.to_html(index=False, justify='center')
+# tabletoinsert = ccb_analysis_functions.makeinserttable('otasallall', html_table)
+# prevtable = soup.find(id="otasallall")
+# prevtable.replace_with(tabletoinsert)
 
 cur.close()
+
+
+
+# Get a list of all the Docket Numbers in the Cases table
+# cases = []
+# cur.execute('''SELECT DocketNumber FROM Cases''')
+# for row in cur:
+#     cases.append(row[0])
+
 
 # dismissalinfolist = []
 # for documentnum in dismissals[100:150]:
