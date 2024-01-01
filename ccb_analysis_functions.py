@@ -84,3 +84,16 @@ def checkrepviacase(docketnum):
         if row[0] is not None:
             represented = 1
     return represented
+
+def checkrepviadoc(documentnum):
+    conn = sqlite3.connect("ccbdocsinfo.db")
+    cur = conn.cursor()
+    cur.execute('''SELECT DocketNumber from Documents WHERE DocumentNumber = ?''', (documentnum, ))
+    for row in cur:
+        docketnum = row[0]
+    cur.execute('''SELECT ClaimantLawFirm FROM Claimants WHERE DocketNumber = ?''', (docketnum, ))
+    represented = 0
+    for row in cur:
+        if row[0] is not None:
+            represented = 1
+    return represented
