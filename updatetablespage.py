@@ -45,7 +45,7 @@ for case in allclaims:
         firstyearclaims.append(case)
 
 # Read the existing file
-existingtablespage = open("../bibliobaloney.github.io/ccbdatatablespage.html", "r")
+existingtablespage = open("../bibliobaloney.github.io/index.html", "r")
 html = existingtablespage.read()
 soup = bs4.BeautifulSoup(html, features="html.parser")
 existingtablespage.close()
@@ -97,7 +97,7 @@ tableheaders = ['Caption', 'Determination type', 'Damages', 'Claimant represente
 determindationsdf = pd.DataFrame.from_dict(fdcaseinfo, orient='index', columns=tableheaders)
 dftable = determindationsdf.to_html(justify='center')
 dftable = dftable.replace('<th></th>', '<th>Docket Number</th>')
-dftablesoup = ccb_analysis_functions.makeinserttable('fdstable', dftable)
+dftablesoup = ccb_analysis_functions.makesortable('fdstable', dftable)
 headercells = dftablesoup.find_all('th')
 for cell in headercells:
     celltext = cell.get_text(strip=True)
@@ -901,6 +901,6 @@ oldspan.string.replace_with(str(len(unrepcasesrecent)))
 
 reasonsfromallotasdf.to_csv('../bibliobaloney.github.io/allotareasons.csv')
 
-with open("../bibliobaloney.github.io/ccbdatatablespage.html", "w") as outf:
+with open("../bibliobaloney.github.io/index.html", "w") as outf:
     outf.write(str(soup))
 outf.close()

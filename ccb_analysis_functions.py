@@ -12,6 +12,13 @@ def makeinserttable(id, table):
     thesoup = BeautifulSoup(newtable, features="html.parser")
     return thesoup
 
+def makesortable(id, table):
+    idstring = 'id="' + id + '"'
+    newtable = table.replace('border="1"', idstring)
+    sortabletable = newtable.replace('class="dataframe"', 'class="dataframe sortable"')
+    thesoup = BeautifulSoup(sortabletable, features="html.parser")
+    return thesoup
+
 def makelinkcell(cell):
     celltext = cell.get_text(strip=True)
     if 'CCB' in celltext:
