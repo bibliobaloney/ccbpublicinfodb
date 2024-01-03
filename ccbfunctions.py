@@ -55,6 +55,17 @@ def getdocsfromrows(doclistrows):
         docsonthispage.append(thisdoc)
     return docsonthispage
 
+# Gets the caption from the docket landing page
+def getcaption(docketnum):
+    url = 'https://dockets.ccb.gov/case/detail/' + docketnum
+    res = requests.get(url)
+    res.raise_for_status()
+    soup = bs4.BeautifulSoup(res.text, 'lxml')
+    title = soup.find('h1')
+    caption = title.get_text(strip=True)
+    caption = caption.replace('Case details for ', '')
+    return caption
+
 #Gather information about types of claims and descriptions of disputes/relief. Returns an 9 item tuple
 def claimtypesanddescriptions(soup):
     smallerdiv = soup.find(attrs={'data-field' : 'smallClaim'})

@@ -80,7 +80,7 @@ if casesrebuild == 'y':
         cases_table_query = '''CREATE TABLE Cases (DocketNumber TEXT UNIQUE, ClaimAvailableYN INTEGER, ClaimURL TEXT, 
         SmallerYN INTEGER, InfringementYN INTEGER, InfringementDescription TEXT, InfringementRelief TEXT, 
         NoninfringementYN INTEGER, NoninfringementDescription TEXT, DmcaYN INTEGER, DmcaDescription TEXT, 
-        DmcaRelief TEXT, Status TEXT)'''
+        DmcaRelief TEXT, Status TEXT, Caption TEXT)'''
         cur.execute(cases_table_query)
         conn.commit()
         print("Cases table freshly created")
@@ -100,9 +100,9 @@ cur.execute('SELECT DocumentNumber, DocketNumber FROM Documents WHERE DocumentTy
 for row in cur:
     docketnum = row[1]
     claimurl = "https://dockets.ccb.gov/claim/view/" + str(row[0])
-    newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None)
+    newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None, None)
     caseswithclaims.append(newclaim)
-cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", caseswithclaims)
+cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", caseswithclaims)
 conn.commit()
 print("Docket Number and URL for", cur.rowcount, "new claims added")
 
@@ -113,9 +113,9 @@ cur.execute("SELECT DocumentNumber, DocketNumber FROM Documents WHERE DocumentTy
 for row in cur:
     docketnum = row[1]
     claimurl = "https://dockets.ccb.gov/claim/view/" + str(row[0])
-    newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None)
+    newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None, None)
     amendedclaimonly.append(newclaim)
-cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", amendedclaimonly)
+cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", amendedclaimonly)
 conn.commit()
 print("Docket Number and URL for", cur.rowcount, "amended-claim-only claims added")
 
@@ -134,9 +134,9 @@ noclaimavailable = list(noclaimavailableset)
 noclaimavailable.sort()
 noclaimdockets = []
 for case in noclaimavailable:
-    newrow = (case, 0, None, None, None, None, None, None, None, None, None, None, None)
+    newrow = (case, 0, None, None, None, None, None, None, None, None, None, None, None, None)
     noclaimdockets.append(newrow)
-cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", noclaimdockets)
+cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", noclaimdockets)
 conn.commit()
 print(cur.rowcount, "docket numbers added for cases with documents but no claim available")
 
@@ -235,6 +235,18 @@ print("Adding info about works to database")
 cur.executemany('''INSERT INTO Works VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', worksinfotoadd)
 conn.commit()
 print("Works info added for", cur.rowcount, "works")
+
+#Add the caption for cases that don't have one yet
+captionsanddockets = []
+cur.execute('''SELECT DocketNumber FROM Cases WHERE Caption IS NULL''')
+for row in cur:
+    docketnum = row[0]
+    caption = ccbfunctions.getcaption(docketnum)
+    newtuple = (caption, docketnum)
+    captionsanddockets.append(newtuple)
+cur.executemany('''UPDATE Cases SET Caption = ? WHERE DocketNumber = ?''', captionsanddockets)
+conn.commit()
+print("Caption added for", cur.rowcount, "cases")
 
 #In case you're running this for the first time or decided to restructure the Dismissals table
 docsrebuild = input('Do you want to (re)build the Dismissals table from scratch (y/n)?')
