@@ -738,6 +738,49 @@ tabletoinsert = ccb_analysis_functions.makeinserttable('registeredold', html_tab
 prevtable = soup.find(id="registeredold")
 prevtable.replace_with(tabletoinsert)
 
+### Claimants
+# Get list of claimants and update the table
+cur.execute('''SELECT ClaimantName from Claimants''')
+allclaimants = []
+for row in cur:
+    allclaimants.append(row[0])
+claimants = pd.Series(data=allclaimants)
+df = claimants.value_counts().rename_axis('Claimants').reset_index(name='Cases')
+df = df[df['Cases'] > 2]
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('claimantstable', html_table)
+prevtable = soup.find(id='claimantstable')
+prevtable.replace_with(tabletoinsert)
+
+#Get a list of respondents and update the table
+cur.execute('''SELECT RespondentName from Respondents''')
+allrespondents = []
+for row in cur:
+    allrespondents.append(row[0])
+respondents = pd.Series(data=allrespondents)
+df = respondents.value_counts().rename_axis('Respondents').reset_index(name='Cases')
+df = df[df['Cases'] > 2]
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('respondentstable', html_table)
+prevtable = soup.find(id='respondentstable')
+prevtable.replace_with(tabletoinsert)
+
+#Get a list of respondents that have opted out, update the table, csv, and count
+cur.execute('''SELECT RespondentName from Respondents WHERE OptedOutYN = 1''')
+alloptouts = []
+for row in cur:
+    alloptouts.append(row[0])
+oldspan = soup.find(id="numoptouts")
+oldspan.string.replace_with(str(len(alloptouts)))
+optouts = pd.Series(data=alloptouts)
+dfalloptouts = optouts.value_counts().rename_axis('Respondents opting out').reset_index(name='Cases')
+dfalloptouts.to_csv('../bibliobaloney.github.io/allccboptouts.csv', index=False)
+df = dfalloptouts[dfalloptouts['Cases'] > 1]
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('optoutstable', html_table)
+prevtable = soup.find(id='optoutstable')
+prevtable.replace_with(tabletoinsert)
+
 ### Orders to Amend
 #Create all 27 lists and sets
 allreasonsall, allreasonsrecent, allreasonsfirstyear = [], [], []
