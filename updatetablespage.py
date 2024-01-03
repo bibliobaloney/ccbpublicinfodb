@@ -50,6 +50,37 @@ html = existingtablespage.read()
 soup = bs4.BeautifulSoup(html, features="html.parser")
 existingtablespage.close()
 
+#Create a searchable file of narratives from infringement claims
+cur.execute('''SELECT DocketNumber, Caption, ClaimURL, InfringementDescription, InfringementRelief 
+            FROM Cases WHERE InfringementYN = 1 ORDER BY DocketNumber DESC''')
+infringementdescriptions = []
+for row in cur:
+    infringementdescriptions.append(row)
+df = pd.DataFrame(infringementdescriptions, columns =['Docket Number', 'Caption', 'Claim URL', 
+                                                      'Describe the infringement', 'Relief sought'])
+df.to_csv('infringementdescriptions.csv', index=False)
+
+#Create a searchable file of narratives from noninfringement claims
+cur.execute('''SELECT DocketNumber, Caption, ClaimURL, NoninfringementDescription 
+            FROM Cases WHERE NoninfringementYN = 1 ORDER BY DocketNumber DESC''')
+noninfringementdescriptions = []
+for row in cur:
+    noninfringementdescriptions.append(row)
+df = pd.DataFrame(noninfringementdescriptions, columns =['Docket Number', 'Caption', 'Claim URL', 
+                                                      'Describe dispute with respondent(s)'])
+df.to_csv('noninfringementdescriptions.csv', index=False)
+
+#Create a searchable file of narratives from DMCA claims
+cur.execute('''SELECT DocketNumber, Caption, ClaimURL, DmcaDescription, DmcaRelief 
+            FROM Cases WHERE DmcaYN = 1 ORDER BY DocketNumber DESC''')
+dmcadescriptions = []
+for row in cur:
+    dmcadescriptions.append(row)
+df = pd.DataFrame(dmcadescriptions, columns =['Docket Number', 'Caption', 'Claim URL', 
+                                                      'Explanation of the Misrepresentation', 
+                                                      'Relief sought'])
+df.to_csv('dmcadescriptions.csv', index=False)
+
 # Update the final determindations table
 cur.execute('''SELECT * FROM FinalDeterminations JOIN Documents USING(DocumentNumber)''')
 fdresults = []
@@ -65,7 +96,6 @@ for result in fdresults:
     claimdates = []
     for row in cur:
         claimdates.append(row[0])
-    cur.execute('''SELECT ClaimantName FROM Claimants''')
     claimdates.sort()
     oldestclaimdate = claimdates[0]
     result.append(oldestclaimdate)
@@ -89,7 +119,9 @@ for result in fdresults:
     fddate = date.fromisoformat(result[8])
     claimdate = date.fromisoformat(result[9])
     daystofd = (fddate-claimdate).days
-    caption = ccb_analysis_functions.constructcaption(docketnum)
+    cur.execute('''SELECT Caption from Cases WHERE DocketNumber = ?''', (docketnum, ))
+    for row in cur:
+        caption = row[0]
     fdcaseinfo[docketnum] = [caption, fdtype, damages, claimantrepyn, fddate, daystofd]
 
 tableheaders = ['Caption', 'Determination type', 'Damages', 'Claimant represented?', 

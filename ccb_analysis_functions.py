@@ -49,39 +49,6 @@ def checkrepresentation(caselist):
                 allfirms.append(firm)
     return (representedcases, caseswithmultiplefirms, allfirms)
 
-def shortenedname(longname):
-    companylasts = ['inc', 'ltd', 'corporation', 'llc', 'corp']
-    longname = longname.strip('*')
-    pieces = longname.split(' ')
-    last = pieces[-1].strip('.')
-    lowerlast = last.lower()
-    shortname = longname
-    if lowerlast not in companylasts:
-        if len(pieces) == 2 or (len(pieces) == 3 and len(pieces[1]) == 1):
-            shortname = pieces[-1]
-    if len(pieces) > 4:
-        bits = shortname.split(' ', 3)
-        shortname = bits[0] + ' ' + bits[1] + ' ' + bits[2]
-    if lowerlast in companylasts:
-        bits = shortname.rsplit(' ', 1)
-        shortname = bits[0]
-    shortname = shortname.rstrip(',')
-    return shortname
-
-def constructcaption(docketnum):
-    conn = sqlite3.connect('ccbdocsinfo.db')
-    cur = conn.cursor()
-    cur.execute('''SELECT ClaimantName FROM Claimants WHERE DocketNumber = ?''', (docketnum, ))
-    claimants = []
-    for row in cur:
-        claimants.append(row[0])
-    respondents = []
-    cur.execute('''SELECT RespondentName FROM Respondents WHERE DocketNumber = ?''', (docketnum, ))
-    for row in cur:
-        respondents.append(row[0])
-    caption = shortenedname(claimants[0]) + ' v. ' + shortenedname(respondents[0])
-    return caption
-
 def checkrepviacase(docketnum):
     conn = sqlite3.connect("ccbdocsinfo.db")
     cur = conn.cursor()

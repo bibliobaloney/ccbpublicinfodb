@@ -293,12 +293,14 @@ cur.executemany('''INSERT OR IGNORE INTO FinalDeterminations VALUES (?, ?, ?)'''
 conn.commit()
 print("Final Determination info added for", cur.rowcount, "FDs")
 
-# Get a list of cases to check statuses for
+# Collect and update all the statuses
+# Because trying to exclude dismissed cases keeps giving me cases like 22-CCB-0016 with None status because of 
+# interaction with dropping rows that have no claim when updating db; running status check for 
+# hundreds of cases doesn't take that long, but revisit when you feel smarter someday.
 cases = []
-cur.execute('''SELECT DocketNumber FROM Cases WHERE Status NOT LIKE "Dismisse%"''')
+cur.execute('''SELECT DocketNumber FROM Cases''')
 for row in cur:
     cases.append(row[0])
-# Collect the statuses
 statuslist = []
 for case in cases:
     status = ccbfunctions.getstatus(case)
