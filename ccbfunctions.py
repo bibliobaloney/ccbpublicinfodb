@@ -540,7 +540,7 @@ def getstatus(docketnum):
     elif 'Scheduling Order' in docs:
         status = 'Active Phase'
     elif 'Proof of Service' in docs or 'Proof of Waiver' in docs:
-        status = 'Waiting for Scheduling Order'
+        status = 'Waiting for Scheduling Order/Expiration of Opt Out Window'
     elif len(thingstosort) > 0:
         thingstosort.sort()
         mostrecent = thingstosort[-1][1]
