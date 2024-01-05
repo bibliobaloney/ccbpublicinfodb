@@ -1,6 +1,7 @@
 import requests, bs4, sqlite3
 from pdfminer.high_level import extract_text
 import ccbfunctions
+from datetime import date
 
 # Connect to the db
 try:
@@ -303,7 +304,7 @@ for row in cur:
     cases.append(row[0])
 statuslist = []
 for case in cases:
-    status = ccbfunctions.getstatus(case)
+    status = ccbfunctions.getstatus(case, date.today())
     statuslist.append((status, case))
 # Update the statuses
 cur.executemany('''UPDATE Cases SET Status = ? WHERE DocketNumber = ?''', statuslist)

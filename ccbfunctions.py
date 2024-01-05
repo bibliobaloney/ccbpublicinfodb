@@ -496,13 +496,13 @@ def checkdefault(docketnum):
         default = int(defaultcheck)
     return default
 
-# Takes a docket number, checks the documents that have been filed, and returns a case status
-def getstatus(docketnum):
+# Takes a docket number and a date (e.g. today), checks the documents that have been filed, and returns a case status
+def getstatus(docketnum, statusdate):
     status = None
     conn = sqlite3.connect("ccbdocsinfo.db")
     cur = conn.cursor()
     cur.execute('''SELECT FilingDate, DocumentType, DocumentNumber, DocumentTitle FROM Documents 
-                WHERE DocketNumber = ?''', (docketnum, ))
+                WHERE DocketNumber = ? AND FilingDate <= ?''', (docketnum, statusdate, ))
     datesanddocs = []
     docs = []
     doctitles = []
@@ -511,7 +511,6 @@ def getstatus(docketnum):
         docs.append(row[1])
         doctitles.append(row[3])
     fdrows = [x for x in datesanddocs if 'Final Determination' in x[1]]
-    orderrows = [x for x in datesanddocs if 'Order' in x[1]]
     ordermatters = {'Notice of Compliance and Direction to Serve': 'Waiting for Proof of Service', 
                     'Amended Claim': 'Waiting for Review of Amended Claim', 
                     'Order to Amend Noncompliant Claim': 'Waiting for Amended Claim'}
@@ -548,10 +547,7 @@ def getstatus(docketnum):
     elif 'Abeyance Order' in docs:
         status = 'In Abeyance'
     elif 'Order Closing Case' in doctitles:
-        status = 'Closed; failure of payment likely'
-    elif len(orderrows) > 0:
-        latest = orderrows[-1]
-        status = latest[3] + ' was last order filed'
+        status = 'Closed; looks like payment failed'
     elif 'Claim' in docs:
         status = 'Waiting for Initial Review'
     if status == 'None':

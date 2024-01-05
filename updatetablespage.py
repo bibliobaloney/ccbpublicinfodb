@@ -1,14 +1,17 @@
 import bs4, sqlite3
 import statistics
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+from dateutil.relativedelta import relativedelta
 import ccb_analysis_functions
 import ccbfunctions
 import pandas as pd
 import plotly.express as px
+#datetime import is for strftime, used in big bar chart at end of this script
 
 # Save some strings and things to use later
 startafile = '<!DOCTYPE html><html><head></head><body>' + '\n'
 endafile = '</body></html>'
+ccbstart = date.fromisoformat('2022-06-16')
 thirtydaysago = date.today() - timedelta(days=30)
 ccbanniversary = date.fromisoformat('2023-06-16')
 
@@ -82,7 +85,8 @@ df = pd.DataFrame(dmcadescriptions, columns =['Docket Number', 'Caption', 'Claim
 df.to_csv('dmcadescriptions.csv', index=False)
 
 # Update the final determindations table
-cur.execute('''SELECT * FROM FinalDeterminations JOIN Documents USING(DocumentNumber)''')
+cur.execute('''SELECT * FROM FinalDeterminations JOIN Documents USING(DocumentNumber) 
+            ORDER BY FilingDate DESC''')
 fdresults = []
 fdcases = []
 fdcaseinfo = dict()
@@ -288,7 +292,7 @@ activereptable.replace_with(tablesoup)
 openstatuses=[]
 cur.execute('''SELECT Status FROM Cases WHERE Status IN ('Waiting for Proof of Service', 
             'Waiting for Review of Amended Claim', 'Waiting for Amended Claim', 
-            'Waiting for Scheduling Order', 'In Abeyance', 'Waiting for Initial Review')''')
+            'Waiting for Scheduling Order/Expiration of Opt Out Window', 'In Abeyance', 'Waiting for Initial Review')''')
 for row in cur:
     openstatuses.append(row[0])
 openstatusseries = pd.Series(data=openstatuses)
@@ -975,6 +979,40 @@ oldspan.string.replace_with(str(len(unrepcasesrecent)))
 # oldspan.string.replace_with(str(len(unrepcasesfirstyear)))
 
 reasonsfromallotasdf.to_csv('../bibliobaloney.github.io/allotareasons.csv')
+
+print('Now updating the big "status over time" table; un-comment-out this section once a month (after the 16th)')
+### Create the big crazy status chart
+# First, get the list of dates to check on. 
+statusdates = []
+datetoadd = ccbstart + relativedelta(months=1)
+while datetoadd < date.today():
+    statusdates.append(datetoadd)
+    datetoadd = datetoadd + relativedelta(months=1)
+# Then start adding data points: for each date, count (open) cases matching a subset of statuses
+# listofstatustuples = []
+# for item in statusdates:
+#     statuses = []
+#     cases = set()
+#     cur.execute('''SELECT DocketNumber FROM Documents WHERE FilingDate < ?''', (item, ))
+#     for row in cur:
+#         cases.add(row[0])
+#     caselist = list(cases)
+#     for case in caselist:
+#         casestatus = ccbfunctions.getstatus(case, item)
+#         statuses.append(casestatus)
+#     statuscounts = {}
+#     for status in statuses:
+#         statuscounts[status] = statuscounts.get(status, 0) + 1
+#     openstatuses = ['In Abeyance', 'Waiting for Initial Review', 'Waiting for Amended Claim', 'Waiting for Review of Amended Claim', 
+#                     'Waiting for Proof of Service', 'Waiting for Scheduling Order/Expiration of Opt Out Window', 
+#                     'Active Phase']
+#     datestring = item.strftime("%y-%m-%d")
+#     for desc in statuscounts:
+#         if desc in openstatuses:
+#             listofstatustuples.append((datestring, desc, statuscounts[desc]))
+# df = pd.DataFrame(listofstatustuples, columns =['Date', 'Status', 'Count'])
+# fig=px.bar(df, x='Date', y='Count', color='Status', title="Number of open cases by status over time")
+# fig.write_html("../bibliobaloney.github.io/charts/ccbopencasesovertime.html", include_plotlyjs='directory')
 
 with open("../bibliobaloney.github.io/index.html", "w") as outf:
     outf.write(str(soup))
