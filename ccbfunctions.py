@@ -57,6 +57,7 @@ def getdocsfromrows(doclistrows):
 
 # Gets the caption from the docket landing page
 def getcaption(docketnum):
+    print('Getting caption for ', docketnum)
     url = 'https://dockets.ccb.gov/case/detail/' + docketnum
     res = requests.get(url)
     res.raise_for_status()
@@ -330,7 +331,7 @@ def pdftosoup(documentnum):
     html_output_file = 'pdfs/output.html'
     with open(html_output_file, 'w', encoding='utf-8') as html_file:
         html_file.write(html_content)
-    htmlfilecontents = open(html_output_file, "r")
+    htmlfilecontents = open(html_output_file, "r", encoding='utf-8')
     orderhtml = htmlfilecontents.read()
     ordersoup = bs4.BeautifulSoup(orderhtml, 'lxml')
     return ordersoup

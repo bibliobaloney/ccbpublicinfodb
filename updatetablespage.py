@@ -48,7 +48,7 @@ for case in allclaims:
         firstyearclaims.append(case)
 
 # Read the existing file
-existingtablespage = open("../bibliobaloney.github.io/index.html", "r")
+existingtablespage = open("../bibliobaloney.github.io/index.html", "r", encoding='utf-8')
 html = existingtablespage.read()
 soup = bs4.BeautifulSoup(html, features="html.parser")
 existingtablespage.close()
@@ -164,7 +164,7 @@ for row in cur:
 numactivecases = str(len(activecases))
 
 # Create a page that lists all the active cases, and links to them
-with open("../bibliobaloney.github.io/activecasesbarelist.html", "w") as outf:
+with open("../bibliobaloney.github.io/activecasesbarelist.html", "w", encoding='utf-8') as outf:
     outf.write(startafile)
     for case in activecases:
         outf.write('<a href="https://dockets.ccb.gov/case/detail/' + case + '">' + case + '</a>' + '<br />')
@@ -1014,6 +1014,6 @@ while datetoadd < date.today():
 # fig=px.bar(df, x='Date', y='Count', color='Status', title="Number of open cases by status over time")
 # fig.write_html("../bibliobaloney.github.io/charts/ccbopencasesovertime.html", include_plotlyjs='directory')
 
-with open("../bibliobaloney.github.io/index.html", "w") as outf:
+with open("../bibliobaloney.github.io/index.html", "w", encoding='utf-8') as outf:
     outf.write(str(soup))
 outf.close()
