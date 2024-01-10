@@ -333,7 +333,7 @@ for row in cur:
 finaldeterminations.sort()
 
 #Compare to get just the new ones, because downloading and checking pdfs is slow
-newfds = [x for x in finaldeterminations if x not in olderfds]
+newfds = [x for x in finaldeterminations if x[1] not in olderfds]
 print("This run should add", str(len(newfds)), "final determinations")
 
 fdsinfolist = []
