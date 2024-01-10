@@ -318,6 +318,12 @@ if fdsrebuild == 'y':
 else:
     print('Okay, skipping drop and rebuild FinalDeterminations')
 
+#Get a list of determinations already in the Dismissals table, in case you've been here beforfe
+olderfds = []
+cur.execute('SELECT DocumentNumber from FinalDeterminations')
+for row in cur:
+    olderfds.append(row[0])
+
 # Get a list of all the Final Determinations in the Documents table
 finaldeterminations = []
 cur.execute('''SELECT DocketNumber, DocumentNumber, DocumentType from Documents 
@@ -326,8 +332,12 @@ for row in cur:
     finaldeterminations.append(row)
 finaldeterminations.sort()
 
+#Compare to get just the new ones, because downloading and checking pdfs is slow
+newfds = [x for x in finaldeterminations if x not in olderfds]
+print("This run should add", str(len(newfds)), "final determinations")
+
 fdsinfolist = []
-for fdrow in finaldeterminations:
+for fdrow in newfds:
     documentnum = fdrow[1]
     damages = ccbfunctions.getdamages(documentnum)
     docketnum = fdrow[0]
