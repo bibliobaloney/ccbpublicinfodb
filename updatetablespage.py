@@ -61,7 +61,7 @@ for row in cur:
     infringementdescriptions.append(row)
 df = pd.DataFrame(infringementdescriptions, columns =['Docket Number', 'Caption', 'Claim URL', 
                                                       'Describe the infringement', 'Relief sought'])
-df.to_csv('infringementdescriptions.csv', index=False)
+df.to_csv('../bibliobaloney.github.io/infringementdescriptions.csv', index=False)
 
 #Create a searchable file of narratives from noninfringement claims
 cur.execute('''SELECT DocketNumber, Caption, ClaimURL, NoninfringementDescription 
@@ -71,7 +71,7 @@ for row in cur:
     noninfringementdescriptions.append(row)
 df = pd.DataFrame(noninfringementdescriptions, columns =['Docket Number', 'Caption', 'Claim URL', 
                                                       'Describe dispute with respondent(s)'])
-df.to_csv('noninfringementdescriptions.csv', index=False)
+df.to_csv('../bibliobaloney.github.io/noninfringementdescriptions.csv', index=False)
 
 #Create a searchable file of narratives from DMCA claims
 cur.execute('''SELECT DocketNumber, Caption, ClaimURL, DmcaDescription, DmcaRelief 
@@ -82,7 +82,7 @@ for row in cur:
 df = pd.DataFrame(dmcadescriptions, columns =['Docket Number', 'Caption', 'Claim URL', 
                                                       'Explanation of the Misrepresentation', 
                                                       'Relief sought'])
-df.to_csv('dmcadescriptions.csv', index=False)
+df.to_csv('../bibliobaloney.github.io/dmcadescriptions.csv', index=False)
 
 # Update the final determindations table
 cur.execute('''SELECT * FROM FinalDeterminations JOIN Documents USING(DocumentNumber) 
