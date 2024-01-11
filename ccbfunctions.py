@@ -298,7 +298,7 @@ reasonsmenu = {1: "Bad-faith conduct", 2: "Failure to amend", 3: "3 tries and st
                5: "Failure to provide respondent address", 6: "Payment for the claim failed", 7: "Request from claimant", 
                8: "Proof of service not filed", 9: "Copyright registration refused by Copyright Office", 
                10: "Second filing fee not paid", 11:"Foreign respondent; no bad faith found", 
-               12: "Settlement; will become dismissal with prejudice if claimant does not reopen in specified time", 
+               12: "Settlement; prejudice pending", 
                13: "Settlement; dismissed with prejudice", 14: "Settlement; dismissed without prejudice", 
                15: "Copyright registration application abandoned", 16: "Service was not valid", 17: None}
 

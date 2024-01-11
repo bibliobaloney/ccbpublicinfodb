@@ -1014,6 +1014,8 @@ while datetoadd < date.today():
 # fig=px.bar(df, x='Date', y='Count', color='Status', title="Number of open cases by status over time")
 # fig.write_html("../bibliobaloney.github.io/charts/ccbopencasesovertime.html", include_plotlyjs='directory')
 
+cur.close()
+conn.close()
 with open("../bibliobaloney.github.io/index.html", "w", encoding='utf-8') as outf:
     outf.write(str(soup))
 outf.close()

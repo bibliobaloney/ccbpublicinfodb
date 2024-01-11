@@ -312,3 +312,4 @@ conn.commit()
 print("Status updated for", cur.rowcount, "dockets")
 
 cur.close()
+conn.close()
