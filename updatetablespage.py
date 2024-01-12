@@ -231,7 +231,7 @@ for case in activecases:
     else:
         participatingrespondents.append("It's complicated")
 participatingseries = pd.Series(data=participatingrespondents)
-df = participatingseries.value_counts().rename_axis('Claim type').reset_index(name='Cases')
+df = participatingseries.value_counts().rename_axis('Any filings by respondent?').reset_index(name='Cases')
 html_table = df.to_html(index=False, justify='center')
 potentialdefaulttoinsert = ccb_analysis_functions.makeinserttable('roadtodefault', html_table)
 oldpotentialdefault = soup.find(id='roadtodefault')
