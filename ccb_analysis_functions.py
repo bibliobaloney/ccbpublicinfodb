@@ -1,5 +1,7 @@
 import sqlite3
 from bs4 import BeautifulSoup
+from datetime import date, timedelta
+from calendar import monthrange
 
 def makeinsertspan(id, stuff):
     thespan = '<span id="' + id + '">' + stuff + '</span>'
@@ -71,3 +73,20 @@ def checkrepviadoc(documentnum):
         if row[0] is not None:
             represented = 1
     return represented
+
+def last_dates_of_months(start_date, end_date):
+    dateset = set()
+    d = start_date
+    while True:
+        # Compute first and last dates of the month.
+        month_start = d.replace(day = 1)
+        n_days = monthrange(d.year, d.month)[1]
+        month_end = d.replace(day = n_days)
+        # Yield or break.
+        if month_end <= end_date:
+            dateset.add(month_end)
+        else:
+            break
+        # Advance to a date in the next month.
+        d = month_start + timedelta(days = 31)
+    return dateset

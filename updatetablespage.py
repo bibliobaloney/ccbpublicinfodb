@@ -1,6 +1,6 @@
 import bs4, sqlite3
 import statistics
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 import ccb_analysis_functions
 import ccbfunctions
@@ -525,6 +525,42 @@ tablesoup = ccb_analysis_functions.makeinserttable('closedcasestatus', html_tabl
 statustable = soup.find(id="closedcasestatus")
 statustable.replace_with(tablesoup)
 #Number of final determinations updated earlier, with other span near beginning of page
+
+# Update the chart about opening and closing cases
+ends = (ccb_analysis_functions.last_dates_of_months(ccbstart, date.today()))
+ends.add(date.today())
+datestocheck = list(ends)
+datestocheck.sort()
+openandshut = []
+docketswehave, dismissalswehave, fdswehave = set(), set(), set()
+for item in datestocheck:
+    monthbeingcounted = item.strftime("%b-%y")
+    cur.execute('''SELECT DocketNumber from Documents WHERE FilingDate <= ?''', (item, ))
+    for row in cur:
+        docketnum = row[0]
+        if docketnum not in docketswehave:
+            openandshut.append((docketnum, 1, monthbeingcounted, 'New Dockets'))
+            docketswehave.add(docketnum)
+    cur.execute('''SELECT DocumentNumber from Documents WHERE DocumentType LIKE "Order Dismissin%" 
+                AND FilingDate <= ?''', (item,))
+    for row in cur:
+        documentnum = row[0]
+        if documentnum not in dismissalswehave:
+            openandshut.append((documentnum, 1, monthbeingcounted, 'Dismissals'))
+            dismissalswehave.add(documentnum)
+    cur.execute('''SELECT DocumentNumber from Documents WHERE DocumentType LIKE "Final Determinatio%" 
+                AND FilingDate <= ?''', (item,))
+    for row in cur:
+        documentnum = row[0]
+        if documentnum not in fdswehave:
+            openandshut.append((documentnum, 1, monthbeingcounted, 'Final Determinations'))
+            fdswehave.add(documentnum)
+df = pd.DataFrame(openandshut, columns =['Docket or Document', 'Number', 'Month', 'Type'])
+fig = px.histogram(df, x="Month", y="Number",
+             color='Type', barmode='group', 
+             title="New dockets, dismissals, and final determinations by month")
+fig.update_layout(barmode='group', bargap=0.05,bargroupgap=0.0)
+fig.write_html("../bibliobaloney.github.io/charts/ccbopeningandclosing.html", include_plotlyjs='directory')
 
 #Update types of claims for all available claims (not just open cases)
 listclaimtypes = []
