@@ -1019,36 +1019,36 @@ reasonsfromallotasdf.to_csv('../bibliobaloney.github.io/allotareasons.csv')
 print('Now updating the big "status over time" table; un-comment-out this section once a month (after the 16th)')
 ### Create the big crazy status chart
 # First, get the list of dates to check on. 
-statusdates = []
-datetoadd = ccbstart + relativedelta(months=1)
-while datetoadd < date.today():
-    statusdates.append(datetoadd)
-    datetoadd = datetoadd + relativedelta(months=1)
-# Then start adding data points: for each date, count (open) cases matching a subset of statuses
-listofstatustuples = []
-for item in statusdates:
-    statuses = []
-    cases = set()
-    cur.execute('''SELECT DocketNumber FROM Documents WHERE FilingDate < ?''', (item, ))
-    for row in cur:
-        cases.add(row[0])
-    caselist = list(cases)
-    for case in caselist:
-        casestatus = ccbfunctions.getstatus(case, item)
-        statuses.append(casestatus)
-    statuscounts = {}
-    for status in statuses:
-        statuscounts[status] = statuscounts.get(status, 0) + 1
-    openstatuses = ['In Abeyance', 'Waiting for Initial Review', 'Waiting for Amended Claim', 'Waiting for Review of Amended Claim', 
-                    'Waiting for Proof of Service', 'Waiting for Scheduling Order/Expiration of Opt Out Window', 
-                    'Active Phase']
-    datestring = item.strftime("%y-%m-%d")
-    for desc in statuscounts:
-        if desc in openstatuses:
-            listofstatustuples.append((datestring, desc, statuscounts[desc]))
-df = pd.DataFrame(listofstatustuples, columns =['Date', 'Status', 'Count'])
-fig=px.bar(df, x='Date', y='Count', color='Status', title="Number of open cases by status over time")
-fig.write_html("../bibliobaloney.github.io/charts/ccbopencasesovertime.html", include_plotlyjs='directory')
+# statusdates = []
+# datetoadd = ccbstart + relativedelta(months=1)
+# while datetoadd < date.today():
+#     statusdates.append(datetoadd)
+#     datetoadd = datetoadd + relativedelta(months=1)
+# # Then start adding data points: for each date, count (open) cases matching a subset of statuses
+# listofstatustuples = []
+# for item in statusdates:
+#     statuses = []
+#     cases = set()
+#     cur.execute('''SELECT DocketNumber FROM Documents WHERE FilingDate < ?''', (item, ))
+#     for row in cur:
+#         cases.add(row[0])
+#     caselist = list(cases)
+#     for case in caselist:
+#         casestatus = ccbfunctions.getstatus(case, item)
+#         statuses.append(casestatus)
+#     statuscounts = {}
+#     for status in statuses:
+#         statuscounts[status] = statuscounts.get(status, 0) + 1
+#     openstatuses = ['In Abeyance', 'Waiting for Initial Review', 'Waiting for Amended Claim', 'Waiting for Review of Amended Claim', 
+#                     'Waiting for Proof of Service', 'Waiting for Scheduling Order/Expiration of Opt Out Window', 
+#                     'Active Phase']
+#     datestring = item.strftime("%y-%m-%d")
+#     for desc in statuscounts:
+#         if desc in openstatuses:
+#             listofstatustuples.append((datestring, desc, statuscounts[desc]))
+# df = pd.DataFrame(listofstatustuples, columns =['Date', 'Status', 'Count'])
+# fig=px.bar(df, x='Date', y='Count', color='Status', title="Number of open cases by status over time")
+# fig.write_html("../bibliobaloney.github.io/charts/ccbopencasesovertime.html", include_plotlyjs='directory')
 
 cur.close()
 conn.close()
