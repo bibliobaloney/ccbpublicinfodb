@@ -1016,9 +1016,9 @@ oldspan.string.replace_with(str(len(unrepcasesrecent)))
 
 reasonsfromallotasdf.to_csv('../bibliobaloney.github.io/allotareasons.csv')
 
-print('Now updating the big "status over time" table; un-comment-out this section once a month (after the 16th)')
-### Create the big crazy status chart
-# First, get the list of dates to check on. 
+# print('Now updating the big "status over time" table; un-comment-out this section once a month (after the 16th)')
+# ### Create the big crazy status chart
+# # First, get the list of dates to check on. 
 # statusdates = []
 # datetoadd = ccbstart + relativedelta(months=1)
 # while datetoadd < date.today():
