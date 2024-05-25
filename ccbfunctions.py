@@ -469,11 +469,13 @@ def checkdefault(docketnum):
                 OptedOutYN = 0''', (docketnum, ))
     respondents = set()
     for row in cur:
-        respondents.add(row[0])
+        splitrespondent = row[0].split(",")
+        respondents.add(splitrespondent[0])
     cur.execute('''SELECT DocumentParty from Documents WHERE DocketNumber = ?''', (docketnum, ))
     filingparties = set()
     for row in cur:
-        filingparties.add(row[0])
+        splitfiler = row[0].split(",")
+        filingparties.add(splitfiler[0])
     filingrespondents = set()
     absentees = set()
     for resp in respondents:
