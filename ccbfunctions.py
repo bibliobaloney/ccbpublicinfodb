@@ -475,7 +475,8 @@ def checkdefault(docketnum):
     filingparties = set()
     for row in cur:
         splitfiler = row[0].split(",")
-        filingparties.add(splitfiler[0])
+        for partialfiler in splitfiler:
+            filingparties.add(partialfiler)
     filingrespondents = set()
     absentees = set()
     for resp in respondents:
