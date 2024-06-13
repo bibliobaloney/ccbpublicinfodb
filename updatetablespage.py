@@ -13,7 +13,9 @@ startafile = '<!DOCTYPE html><html><head></head><body>' + '\n'
 endafile = '</body></html>'
 ccbstart = date.fromisoformat('2022-06-16')
 thirtydaysago = date.today() - timedelta(days=30)
+sixtydaysago = date.today() - timedelta(days=60)
 ccbanniversary = date.fromisoformat('2023-06-16')
+secondanniversary = date.fromisoformat('2024-06-16')
 
 # Connect to the database
 print('Connecting to the database...')
@@ -34,6 +36,7 @@ for row in cur:
 
 recentclaims = []
 firstyearclaims = []
+secondyearclaims = []
 for case in allclaims:
     cur.execute('''SELECT FilingDate FROM Documents WHERE DocketNumber = ? AND 
                     (DocumentType = "Claim" OR DocumentType = "Amended Claim")''', (case, ))
@@ -42,9 +45,11 @@ for case in allclaims:
         claimdates.append(row[0])
     claimdates.sort()
     d1 = date.fromisoformat(claimdates[0])
-    if d1 > thirtydaysago:
+    if d1 > sixtydaysago:
         recentclaims.append(case)
-    if d1 < ccbanniversary:
+    if d1 < secondanniversary and d1 >= ccbanniversary:
+        secondyearclaims.append(case)
+    elif d1 < ccbanniversary:
         firstyearclaims.append(case)
 
 # Read the existing file
@@ -354,7 +359,7 @@ prevtable.replace_with(tablesoup)
 # For the recent dismissals
 recentreasons, dismissalreasonsrecentrep, dismissalreasonsrecentunrep = [], [], []
 cur.execute('''SELECT DocumentNumber, Reason1, Reason2 FROM Dismissals JOIN Documents USING(DocumentNumber) 
-            WHERE Documents.FilingDate > date("now", "-30 days")''')
+            WHERE Documents.FilingDate > date("now", "-60 days")''')
 for row in cur:
     documentnum = row[0]
     reason = row[1]
@@ -390,6 +395,46 @@ df = reasonseries.value_counts().rename_axis('Reasons').reset_index(name='Orders
 html_table = df.to_html(index=False, justify='center')
 tablesoup = ccb_analysis_functions.makeinserttable('dismissalreasonsrecentunrep', html_table)
 prevtable = soup.find(id="dismissalreasonsrecentunrep")
+prevtable.replace_with(tablesoup)
+
+# For dismissals from the second year, for comparison
+# Does not need to run every week
+cur.execute('''SELECT DocumentNumber, Reason1, Reason2 FROM Dismissals JOIN Documents USING(DocumentNumber) 
+            WHERE Documents.FilingDate < date("2024-06-16") AND Documents.FilingDate >= date("2023-06-16")''')
+reasonssecondyear, dismissalreasonsrepyeartwo, dismissalreasonsunrepyeartwo = [], [], []
+for row in cur:
+    documentnum = row[0]
+    reason = row[1]
+    secondreason = row[2]
+    reasonssecondyear.append(reason)
+    rep = ccb_analysis_functions.checkrepviadoc(documentnum)
+    if rep == 0:
+        dismissalreasonsunrepyeartwo.append(reason)
+    elif rep == 1:
+        dismissalreasonsrepyeartwo.append(reason)
+    if secondreason != None:
+        reasonssecondyear.append(secondreason)
+        if rep == 0:
+            dismissalreasonsunrepyeartwo.append(secondreason)
+        elif rep ==1:
+            dismissalreasonsrepyeartwo.append(secondreason)
+reasonseries = pd.Series(data=reasonssecondyear)
+df = reasonseries.value_counts().rename_axis('Reasons').reset_index(name='Orders')
+html_table = df.to_html(index=False, justify='center')
+tablesoup = ccb_analysis_functions.makeinserttable('dismissalreasonsyeartwo', html_table)
+prevtable = soup.find(id="dismissalreasonsyeartwo")
+prevtable.replace_with(tablesoup)
+reasonseries = pd.Series(data=dismissalreasonsrepyeartwo)
+df = reasonseries.value_counts().rename_axis('Reasons').reset_index(name='Orders')
+html_table = df.to_html(index=False, justify='center')
+tablesoup = ccb_analysis_functions.makeinserttable('dismissalreasonsrepyeartwo', html_table)
+prevtable = soup.find(id="dismissalreasonsrepyeartwo")
+prevtable.replace_with(tablesoup)
+reasonseries = pd.Series(data=dismissalreasonsunrepyeartwo)
+df = reasonseries.value_counts().rename_axis('Reasons').reset_index(name='Orders')
+html_table = df.to_html(index=False, justify='center')
+tablesoup = ccb_analysis_functions.makeinserttable('dismissalreasonsunrepyeartwo', html_table)
+prevtable = soup.find(id="dismissalreasonsunrepyeartwo")
 prevtable.replace_with(tablesoup)
 
 # For dismissals from the first year, for comparison
@@ -442,6 +487,7 @@ for row in cur:
 timestodis = []
 timestodisrecent = []
 timestodisold = []
+timestodisyeartwo = []
 for dismissal in dismissalinfo:
     cur.execute('''SELECT FilingDate FROM Documents WHERE DocumentType = "Claim" AND 
                 DocketNumber = ?''', (dismissal[0], ))
@@ -453,9 +499,11 @@ for dismissal in dismissalinfo:
         d2 = date.fromisoformat(dismissal[1])
         daysfromclaimtodismissal = (d2-d1).days
         timestodis.append(daysfromclaimtodismissal)
-        if d2 > thirtydaysago:
+        if d2 > sixtydaysago:
             timestodisrecent.append(daysfromclaimtodismissal)
-        if d2 < ccbanniversary:
+        if d2 < secondanniversary and d2 >= ccbanniversary:
+            timestodisyeartwo.append(daysfromclaimtodismissal)
+        elif d2 < ccbanniversary:
             timestodisold.append(daysfromclaimtodismissal)
     elif len(claimdates) > 1:
         print('Something weird is happening with calculating time to dismissal')
@@ -486,18 +534,33 @@ timetoinsert = ccb_analysis_functions.makeinsertspan('modetodismissalrecent', di
 olddismissalspan = soup.find(id="modetodismissalrecent")
 olddismissalspan.replace_with(timetoinsert)
 
-avgtimetodismissal = str(round(statistics.mean(timestodisold)))
-timetoinsert = ccb_analysis_functions.makeinsertspan('avgtodismissalold', avgtimetodismissal)
-olddismissalspan = soup.find(id="avgtodismissalold")
+# Can stop running after 6/17/2024
+avgtimetodismissal = str(round(statistics.mean(timestodisyeartwo)))
+timetoinsert = ccb_analysis_functions.makeinsertspan('avgtodismissalyeartwo', avgtimetodismissal)
+olddismissalspan = soup.find(id="avgtodismissalyeartwo")
 olddismissalspan.replace_with(timetoinsert)
-dismissaltimesmedian = str(round(statistics.median(timestodisold)))
-timetoinsert = ccb_analysis_functions.makeinsertspan('mediantodismissalold', dismissaltimesmedian)
-olddismissalspan = soup.find(id="mediantodismissalold")
+dismissaltimesmedian = str(round(statistics.median(timestodisyeartwo)))
+timetoinsert = ccb_analysis_functions.makeinsertspan('mediantodismissalyeartwo', dismissaltimesmedian)
+olddismissalspan = soup.find(id="mediantodismissalyeartwo")
 olddismissalspan.replace_with(timetoinsert)
-dismissaltimesmode = str(statistics.multimode(timestodisold))
-timetoinsert = ccb_analysis_functions.makeinsertspan('modetodismissalold', dismissaltimesmode)
-olddismissalspan = soup.find(id="modetodismissalold")
+dismissaltimesmode = str(statistics.multimode(timestodisyeartwo))
+timetoinsert = ccb_analysis_functions.makeinsertspan('modetodismissalyeartwo', dismissaltimesmode)
+olddismissalspan = soup.find(id="modetodismissalyeartwo")
 olddismissalspan.replace_with(timetoinsert)
+
+# # Only needed to run once
+# avgtimetodismissal = str(round(statistics.mean(timestodisold)))
+# timetoinsert = ccb_analysis_functions.makeinsertspan('avgtodismissalold', avgtimetodismissal)
+# olddismissalspan = soup.find(id="avgtodismissalold")
+# olddismissalspan.replace_with(timetoinsert)
+# dismissaltimesmedian = str(round(statistics.median(timestodisold)))
+# timetoinsert = ccb_analysis_functions.makeinsertspan('mediantodismissalold', dismissaltimesmedian)
+# olddismissalspan = soup.find(id="mediantodismissalold")
+# olddismissalspan.replace_with(timetoinsert)
+# dismissaltimesmode = str(statistics.multimode(timestodisold))
+# timetoinsert = ccb_analysis_functions.makeinsertspan('modetodismissalold', dismissaltimesmode)
+# olddismissalspan = soup.find(id="modetodismissalold")
+# olddismissalspan.replace_with(timetoinsert)
 
 #### All Cases
 # Update number of cases
@@ -565,6 +628,7 @@ fig.write_html("../bibliobaloney.github.io/charts/ccbopeningandclosing.html", in
 #Update types of claims for all available claims (not just open cases)
 listclaimtypes = []
 recentclaimtypes = []
+yeartwoclaimtypes = []
 oldclaimtypes = []
 for case in allclaims:
     cur.execute('''SELECT InfringementYN, NoninfringementYN, DmcaYN FROM Cases WHERE DocketNumber = ?''', (case, ))
@@ -582,21 +646,30 @@ for case in allclaims:
                     (DocumentType = "Claim" OR DocumentType = "Amended Claim")''', (case, ))
     if case in recentclaims:
         recentclaimtypes.append(stringofclaims)
-    if case in firstyearclaims:
+    if case in secondyearclaims:
+        yeartwoclaimtypes.append(stringofclaims)
+    elif case in firstyearclaims:
         oldclaimtypes.append(stringofclaims)
 allclaimstypes = pd.Series(data=listclaimtypes)
 df = allclaimstypes.value_counts().rename_axis('Claim type').reset_index(name='Cases')
 html_table = df.to_html(index=False, justify='center')
 alltypestoinsert = ccb_analysis_functions.makeinserttable('allclaimtypes', html_table)
-oldalltypes = soup.find(id="allclaimtypes")
-oldalltypes.replace_with(alltypestoinsert)
+alltypes = soup.find(id="allclaimtypes")
+alltypes.replace_with(alltypestoinsert)
 
 claimtypesrecent = pd.Series(data=recentclaimtypes)
 df = claimtypesrecent.value_counts().rename_axis('Claim type').reset_index(name='Cases')
 html_table = df.to_html(index=False, justify='center')
 typestoinsertrecent = ccb_analysis_functions.makeinserttable('recentclaimtypes', html_table)
-oldtypes = soup.find(id="recentclaimtypes")
-oldtypes.replace_with(typestoinsertrecent)
+recenttypes = soup.find(id="recentclaimtypes")
+recenttypes.replace_with(typestoinsertrecent)
+
+claimtypesyeartwo = pd.Series(data=yeartwoclaimtypes)
+df = claimtypesyeartwo.value_counts().rename_axis('Claim type').reset_index(name='Cases')
+html_table = df.to_html(index=False, justify='center')
+typestoinsertyeartwo = ccb_analysis_functions.makeinserttable('yeartwoclaimtypes', html_table)
+yeartwotypes = soup.find(id="yeartwoclaimtypes")
+yeartwotypes.replace_with(typestoinsertyeartwo)
 
 claimtypesold = pd.Series(data=oldclaimtypes)
 df = claimtypesold.value_counts().rename_axis('Claim type').reset_index(name='Cases')
@@ -608,6 +681,7 @@ oldtypes.replace_with(typestoinsertold)
 # Update tables about whether claimants are choosing the smaller claims track
 listsmaller = []
 recentsmaller = []
+yeartwosmaller = []
 oldsmaller = []
 for case in allclaims:
     cur.execute('''SELECT SmallerYN FROM Cases WHERE DocketNumber = ?''', (case, ))
@@ -620,7 +694,9 @@ for case in allclaims:
                     (DocumentType = "Claim" OR DocumentType = "Amended Claim")''', (case, ))
     if case in recentclaims:
         recentsmaller.append(smalleryn)
-    if case in firstyearclaims:
+    if case in secondyearclaims:
+        yeartwosmaller.append(smalleryn)
+    elif case in firstyearclaims:
         oldsmaller.append(smalleryn)
 allsmaller = pd.Series(data=listsmaller)
 df = allsmaller.value_counts().rename_axis('Smaller?').reset_index(name='Cases')
@@ -636,12 +712,21 @@ smallertoinsert = ccb_analysis_functions.makeinserttable('smallerrecent', html_t
 prevsmaller = soup.find(id="smallerrecent")
 prevsmaller.replace_with(smallertoinsert)
 
-smallerold = pd.Series(data=oldsmaller)
-df = smallerold.value_counts().rename_axis('Smaller?').reset_index(name='Cases')
+# Year 2 data - no need to keep running
+smalleryeartwo = pd.Series(data=yeartwosmaller)
+df = smalleryeartwo.value_counts().rename_axis('Smaller?').reset_index(name='Cases')
 html_table = df.to_html(index=False, justify='center')
-smallertoinsert = ccb_analysis_functions.makeinserttable('smallerold', html_table)
-prevsmaller = soup.find(id="smallerold")
+smallertoinsert = ccb_analysis_functions.makeinserttable('smalleryeartwo', html_table)
+prevsmaller = soup.find(id="smalleryeartwo")
 prevsmaller.replace_with(smallertoinsert)
+
+# # Year 1 data - no need to keep running
+# smallerold = pd.Series(data=oldsmaller)
+# df = smallerold.value_counts().rename_axis('Smaller?').reset_index(name='Cases')
+# html_table = df.to_html(index=False, justify='center')
+# smallertoinsert = ccb_analysis_functions.makeinserttable('smallerold', html_table)
+# prevsmaller = soup.find(id="smallerold")
+# prevsmaller.replace_with(smallertoinsert)
 
 # Update representation information
 # for all claims
@@ -684,6 +769,27 @@ reptoinsert = ccb_analysis_functions.makeinserttable('representationrecent', htm
 prevrep = soup.find(id="representationrecent")
 prevrep.replace_with(reptoinsert)
 
+# for second year claims
+# Does not need to run every week
+representedcases, caseswithmultiplefirms, allfirms = ccb_analysis_functions.checkrepresentation(secondyearclaims)
+yeartworepaspercent = format((len(representedcases)/len(secondyearclaims)), ".0%")
+yeartwomultiplefirms = str(caseswithmultiplefirms)
+oldspan = soup.find(id="pctyeartwoclaimsrep")
+oldspan.string.replace_with(yeartworepaspercent)
+yeartwocasefirms = []
+for item in allfirms:
+    if item is None:
+        yeartwocasefirms.append('No law firm')
+    else:
+        yeartwocasefirms.append(item)
+yeartwofirmsseries = pd.Series(data=yeartwocasefirms)
+dfwithsingles = yeartwofirmsseries.value_counts().rename_axis('Law firm').reset_index(name='Cases')
+df = dfwithsingles[dfwithsingles['Cases'] > 1]
+html_table = df.to_html(index=False, justify='center')
+reptoinsert = ccb_analysis_functions.makeinserttable('representationyeartwo', html_table)
+prevrep = soup.find(id="representationyeartwo")
+prevrep.replace_with(reptoinsert)
+
 # for first year claims
 ## Does not need to run every week
 # representedcases, caseswithmultiplefirms, allfirms = ccb_analysis_functions.checkrepresentation(firstyearclaims)
@@ -709,9 +815,11 @@ prevrep.replace_with(reptoinsert)
 #Collect all the data
 worktypeall = []
 worktyperecent = []
+worktypeyeartwo = []
 worktypeold = []
 registeredall = []
 registeredrecent = []
+registeredyeartwo = []
 registeredold = []
 cur.execute('''SELECT DocketNumber, WorkType, RegisteredYN from Works''')
 for row in cur:
@@ -726,6 +834,9 @@ for row in cur:
     if docketnum in recentclaims:
         worktyperecent.append(worktype)
         registeredrecent.append(registered)
+    if docketnum in secondyearclaims:
+        worktypeyeartwo.append(worktype)
+        registeredyeartwo.append(registered)
     if docketnum in firstyearclaims:
         worktypeold.append(worktype)
         registeredold.append(registered)
@@ -742,17 +853,25 @@ prevtable.replace_with(tabletoinsert)
 series = pd.Series(data=worktyperecent)
 df = series.value_counts().rename_axis('Type of work').reset_index(name='Works')
 html_table = df.to_html(index=False, justify='center')
-tabletoinsert = ccb_analysis_functions.makeinserttable('ingringworktypesrecent', html_table)
-prevtable = soup.find(id="ingringworktypesrecent")
+tabletoinsert = ccb_analysis_functions.makeinserttable('infringworktypesrecent', html_table)
+prevtable = soup.find(id="infringworktypesrecent")
+prevtable.replace_with(tabletoinsert)
+
+#Update work types from claims filed in the second year
+series = pd.Series(data=worktypeyeartwo)
+df = series.value_counts().rename_axis('Type of work').reset_index(name='Works')
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('infringworktypesyeartwo', html_table)
+prevtable = soup.find(id="infringworktypesyeartwo")
 prevtable.replace_with(tabletoinsert)
 
 #Update work types from claims filed in the first year
-series = pd.Series(data=worktypeold)
-df = series.value_counts().rename_axis('Type of work').reset_index(name='Works')
-html_table = df.to_html(index=False, justify='center')
-tabletoinsert = ccb_analysis_functions.makeinserttable('ingringworktypesold', html_table)
-prevtable = soup.find(id="ingringworktypesold")
-prevtable.replace_with(tabletoinsert)
+# series = pd.Series(data=worktypeold)
+# df = series.value_counts().rename_axis('Type of work').reset_index(name='Works')
+# html_table = df.to_html(index=False, justify='center')
+# tabletoinsert = ccb_analysis_functions.makeinserttable('infringworktypesold', html_table)
+# prevtable = soup.find(id="infringworktypesold")
+# prevtable.replace_with(tabletoinsert)
 
 #Update all work registration info
 series = pd.Series(data=registeredall)
@@ -770,13 +889,21 @@ tabletoinsert = ccb_analysis_functions.makeinserttable('registeredrecent', html_
 prevtable = soup.find(id="registeredrecent")
 prevtable.replace_with(tabletoinsert)
 
-#Update registration info from claims filed in the first year
-series = pd.Series(data=registeredold)
+#Update registration info from claims filed in the second year
+series = pd.Series(data=registeredyeartwo)
 df = series.value_counts().rename_axis('Registered?').reset_index(name='Works')
 html_table = df.to_html(index=False, justify='center')
-tabletoinsert = ccb_analysis_functions.makeinserttable('registeredold', html_table)
-prevtable = soup.find(id="registeredold")
+tabletoinsert = ccb_analysis_functions.makeinserttable('registeredyeartwo', html_table)
+prevtable = soup.find(id="registeredyeartwo")
 prevtable.replace_with(tabletoinsert)
+
+#Update registration info from claims filed in the first year
+# series = pd.Series(data=registeredold)
+# df = series.value_counts().rename_axis('Registered?').reset_index(name='Works')
+# html_table = df.to_html(index=False, justify='center')
+# tabletoinsert = ccb_analysis_functions.makeinserttable('registeredold', html_table)
+# prevtable = soup.find(id="registeredold")
+# prevtable.replace_with(tabletoinsert)
 
 ### Claimants
 # Get list of claimants and update the table
@@ -822,16 +949,19 @@ prevtable = soup.find(id='optoutstable')
 prevtable.replace_with(tabletoinsert)
 
 ### Orders to Amend
-#Create all 27 lists and sets
+#Create all 27 lists and sets - add 9 more for end of second year
 allreasonsall, allreasonsrecent, allreasonsfirstyear = [], [], []
 repreasonsall, repreasonsrecent, repreasonsfirstyear = [], [], []
 unrepreasonsall, unrepreasonsrecent, unrepreasonsfirstyear = [], [], []
+allreasonssecondyear, repreasonssecondyear, unrepreasonssecondyear = [], [], []
 numotasallall, numotasallrecent, numotasallfirstyear = set(), set(), set()
 numotasrepall, numotasreprecent, numotasrepfirstyear = set(), set(), set()
 numotasunrepall, numotasunreprecent, numotasunrepfirstyear = set(), set(), set()
+numotasallsecondyear, numotasrepsecondyear, numotasunrepsecondyear = set(), set(), set()
 allcasesall, allcasesrecent, allcasesfirstyear = set(), set(), set()
 repcasesall, repcasesrecent, repcasesfirstyear = set(), set(), set()
 unrepcasesall, unrepcasesrecent, unrepcasesfirstyear = set(), set(), set()
+allcasessecondyear, repcasessecondyear, unrepcasessecondyear = set(), set(), set()
 
 cur.execute('''SELECT * FROM OrdersToAmend JOIN Documents USING(DocumentNumber)''')
 for row in cur:
@@ -843,11 +973,15 @@ for row in cur:
     allreasonsall.append(reason)
     numotasallall.add(documentnum)
     allcasesall.add(docketnum)
-    if filingdate > thirtydaysago:
+    if filingdate > sixtydaysago:
         allreasonsrecent.append(reason)
         numotasallrecent.add(documentnum)
         allcasesrecent.add(docketnum)
-    if filingdate < ccbanniversary:
+    if filingdate < secondanniversary and filingdate >= ccbanniversary:
+        allreasonssecondyear.append(reason)
+        numotasallsecondyear.add(documentnum)
+        allcasessecondyear.add(docketnum)
+    elif filingdate < ccbanniversary:
         allreasonsfirstyear.append(reason)
         numotasallfirstyear.add(documentnum)
         allcasesfirstyear.add(docketnum)
@@ -855,11 +989,15 @@ for row in cur:
         repreasonsall.append(reason)
         numotasrepall.add(documentnum)
         repcasesall.add(docketnum)
-        if filingdate > thirtydaysago:
+        if filingdate > sixtydaysago:
             repreasonsrecent.append(reason)
             numotasreprecent.add(documentnum)
             repcasesrecent.add(docketnum)
-        if filingdate < ccbanniversary:
+        if filingdate < secondanniversary and filingdate >= ccbanniversary:
+            repreasonssecondyear.append(reason)
+            numotasrepsecondyear.add(documentnum)
+            repcasessecondyear.add(docketnum)
+        elif filingdate < ccbanniversary:
             repreasonsfirstyear.append(reason)
             numotasrepfirstyear.add(documentnum)
             repcasesfirstyear.add(docketnum)
@@ -867,11 +1005,15 @@ for row in cur:
         unrepreasonsall.append(reason)
         numotasunrepall.add(documentnum)
         unrepcasesall.add(docketnum)
-        if filingdate > thirtydaysago:
+        if filingdate > sixtydaysago:
             unrepreasonsrecent.append(reason)
             numotasunreprecent.add(documentnum)
             unrepcasesrecent.add(docketnum)
-        if filingdate < ccbanniversary:
+        if filingdate < secondanniversary and filingdate >= ccbanniversary:
+            unrepreasonssecondyear.append(reason)
+            numotasunrepsecondyear.add(documentnum)
+            unrepcasessecondyear.add(docketnum)
+        elif filingdate < ccbanniversary:
             unrepreasonsfirstyear.append(reason)
             numotasunrepfirstyear.add(documentnum)
             unrepcasesfirstyear.add(docketnum)
@@ -891,10 +1033,10 @@ oldspan.string.replace_with(str(len(numotasallall)))
 oldspan = soup.find(id="allcasesall")
 oldspan.string.replace_with(str(len(allcasesall)))
 
-# all OTAS from the past 30 days
+# all OTAS from the past 60 days
 series = pd.Series(data=allreasonsrecent)
 df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
-# df = df[:20]
+df = df[:20]
 html_table = df.to_html(index=False, justify='center')
 tabletoinsert = ccb_analysis_functions.makeinserttable('otasallrecent', html_table)
 prevtable = soup.find(id="otasallrecent")
@@ -906,7 +1048,7 @@ oldspan.string.replace_with(str(len(numotasallrecent)))
 oldspan = soup.find(id="allcasesrecent")
 oldspan.string.replace_with(str(len(allcasesrecent)))
 
-# all OTAS from the firt year of the CCB
+# all OTAS from the first year of the CCB
 ## Does not need to run every week
 # series = pd.Series(data=allreasonsfirstyear)
 # df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
@@ -937,10 +1079,10 @@ oldspan.string.replace_with(str(len(numotasrepall)))
 oldspan = soup.find(id="repcasesall")
 oldspan.string.replace_with(str(len(repcasesall)))
 
-# represented claimant OTAS from the past 30 days
+# represented claimant OTAS from the past 60 days
 series = pd.Series(data=repreasonsrecent)
 df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
-# df = df[:20]
+df = df[:20]
 html_table = df.to_html(index=False, justify='center')
 tabletoinsert = ccb_analysis_functions.makeinserttable('otasreprecent', html_table)
 prevtable = soup.find(id="otasreprecent")
@@ -952,7 +1094,7 @@ oldspan.string.replace_with(str(len(numotasreprecent)))
 oldspan = soup.find(id="repcasesrecent")
 oldspan.string.replace_with(str(len(repcasesrecent)))
 
-# represented claimant OTAS from the firt year of the CCB
+# represented claimant OTAS from the first year of the CCB
 ## Does not need to run every week
 # series = pd.Series(data=repreasonsfirstyear)
 # df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
@@ -980,13 +1122,13 @@ oldspan = soup.find(id="numunrepreasonsall")
 oldspan.string.replace_with(str(len(unrepreasonsall)))
 oldspan = soup.find(id="numotasunrepall")
 oldspan.string.replace_with(str(len(numotasunrepall)))
-oldspan = soup.find(id="unrepcasesall")
+oldspan = soup.find(id="unrepcasesold")
 oldspan.string.replace_with(str(len(unrepcasesall)))
 
-# unrepresented claimant OTAS from the past 30 days
+# unrepresented claimant OTAS from the past 60 days
 series = pd.Series(data=unrepreasonsrecent)
 df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
-# df = df[:20]
+df = df[:20]
 html_table = df.to_html(index=False, justify='center')
 tabletoinsert = ccb_analysis_functions.makeinserttable('otasunreprecent', html_table)
 prevtable = soup.find(id="otasunreprecent")
@@ -998,7 +1140,7 @@ oldspan.string.replace_with(str(len(numotasunreprecent)))
 oldspan = soup.find(id="unrepcasesrecent")
 oldspan.string.replace_with(str(len(unrepcasesrecent)))
 
-# unrepresented claimant OTAS from the firt year of the CCB
+# unrepresented claimant OTAS from the first year of the CCB
 ## Does not need to run every week
 # series = pd.Series(data=unrepreasonsfirstyear)
 # df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
@@ -1013,6 +1155,54 @@ oldspan.string.replace_with(str(len(unrepcasesrecent)))
 # oldspan.string.replace_with(str(len(numotasunrepfirstyear)))
 # oldspan = soup.find(id="unrepcasesold")
 # oldspan.string.replace_with(str(len(unrepcasesfirstyear)))
+
+# all OTAS from the second year of the CCB
+## Does not need to run every week
+series = pd.Series(data=allreasonssecondyear)
+df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
+df = df[:20]
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('otasallsecondyear', html_table)
+prevtable = soup.find(id="otasallsecondyear")
+prevtable.replace_with(tabletoinsert)
+oldspan = soup.find(id="numallreasonsyeartwo")
+oldspan.string.replace_with(str(len(allreasonssecondyear)))
+oldspan = soup.find(id="numotasallyeartwo")
+oldspan.string.replace_with(str(len(numotasallsecondyear)))
+oldspan = soup.find(id="allcasesyeartwo")
+oldspan.string.replace_with(str(len(allcasessecondyear)))
+
+# represented claimant OTAS from the second year of the CCB
+## Does not need to run every week
+series = pd.Series(data=repreasonssecondyear)
+df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
+df = df[:20]
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('otasrepsecondyear', html_table)
+prevtable = soup.find(id="otasrepsecondyear")
+prevtable.replace_with(tabletoinsert)
+oldspan = soup.find(id="numrepreasonsyeartwo")
+oldspan.string.replace_with(str(len(repreasonssecondyear)))
+oldspan = soup.find(id="numotasrepyeartwo")
+oldspan.string.replace_with(str(len(numotasrepsecondyear)))
+oldspan = soup.find(id="repcasesyeartwo")
+oldspan.string.replace_with(str(len(repcasessecondyear)))
+
+# unrepresented claimant OTAS from the second year of the CCB
+## Does not need to run every week
+series = pd.Series(data=unrepreasonssecondyear)
+df = series.value_counts().rename_axis('Reason').reset_index(name='Orders')
+df = df[:20]
+html_table = df.to_html(index=False, justify='center')
+tabletoinsert = ccb_analysis_functions.makeinserttable('otasunrepsecondyear', html_table)
+prevtable = soup.find(id="otasunrepsecondyear")
+prevtable.replace_with(tabletoinsert)
+oldspan = soup.find(id="numunrepreasonsyeartwo")
+oldspan.string.replace_with(str(len(unrepreasonssecondyear)))
+oldspan = soup.find(id="numotasunrepyeartwo")
+oldspan.string.replace_with(str(len(numotasunrepsecondyear)))
+oldspan = soup.find(id="unrepcasesyeartwo")
+oldspan.string.replace_with(str(len(unrepcasessecondyear)))
 
 reasonsfromallotasdf.to_csv('../bibliobaloney.github.io/allotareasons.csv')
 
