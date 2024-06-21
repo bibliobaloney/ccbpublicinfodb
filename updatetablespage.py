@@ -604,13 +604,13 @@ for item in datestocheck:
         if docketnum not in docketswehave:
             openandshut.append((docketnum, 1, monthbeingcounted, 'New Dockets'))
             docketswehave.add(docketnum)
-    cur.execute('''SELECT DocumentNumber from Documents WHERE DocumentType LIKE "Order Dismissin%" 
+    cur.execute('''SELECT DocketNumber from Documents WHERE DocumentType LIKE "Order Dismissing Claim%" 
                 AND FilingDate <= ?''', (item,))
     for row in cur:
-        documentnum = row[0]
-        if documentnum not in dismissalswehave:
-            openandshut.append((documentnum, 1, monthbeingcounted, 'Dismissals'))
-            dismissalswehave.add(documentnum)
+        docketnum = row[0]
+        if docketnum not in dismissalswehave:
+            openandshut.append((docketnum, 1, monthbeingcounted, 'Dismissals'))
+            dismissalswehave.add(docketnum)
     cur.execute('''SELECT DocumentNumber from Documents WHERE DocumentType LIKE "Final Determinatio%" 
                 AND FilingDate <= ?''', (item,))
     for row in cur:
@@ -621,7 +621,7 @@ for item in datestocheck:
 df = pd.DataFrame(openandshut, columns =['Docket or Document', 'Number', 'Month', 'Type'])
 fig = px.histogram(df, x="Month", y="Number",
              color='Type', barmode='group', 
-             title="New dockets, dismissals, and final determinations by month")
+             title="New dockets, dismissed claims, and final determinations by month")
 fig.update_layout(barmode='group', bargap=0.05,bargroupgap=0.0)
 fig.write_html("../bibliobaloney.github.io/charts/ccbopeningandclosing.html", include_plotlyjs='directory')
 
