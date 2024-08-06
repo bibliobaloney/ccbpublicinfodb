@@ -104,25 +104,30 @@ for row in cur:
     res = requests.get(url)
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.text, 'lxml')
-    newclaiminfo = ccbfunctions.claimtypesanddescriptions(soup)
-    plusupdateinfo = (newclaiminfo[0], newclaiminfo[1], newclaiminfo[2], newclaiminfo[3], newclaiminfo[4], newclaiminfo[5], 
-                      newclaiminfo[6], newclaiminfo[7], newclaiminfo[8], docketnum)
-    claiminfotoadd.append(plusupdateinfo)
-    claimantinfoinclaim = ccbfunctions.getclaimantinfo(soup)
-    for claimant in claimantinfoinclaim:
-        plusclaimantupdateinfo = (docketnum, claimant[0], claimant[1], claimant[2], claimant[3], claimant[4],
-                          claimant[5])
-        claimantinfotoadd.append(plusclaimantupdateinfo)
-    print("Getting info about respondents for", docketnum)
-    listofrespondents = ccbfunctions.checkrespondents(docketnum)
-    for respondent in listofrespondents:
-        plusrespupdateinfo = (docketnum, respondent[0], respondent[1], respondent[2], respondent[3])
-        respondentinfotoadd.append(plusrespupdateinfo)
-    if newclaiminfo[1] == 1:
-        worksinfoinclaim = ccbfunctions.getworks(soup)
-        for work in worksinfoinclaim:
-            plusworkupdateinfo = (docketnum, work[0], work[1], work[2], work[3], work[4], work[5], work[6], work[7], work[8])
-            worksinfotoadd.append(plusworkupdateinfo)
+    if soup.title.contents[0] == 'Login to eCCB - eCCB':
+        print("Claim not public for docket number", docketnum)
+        plusupdateinfo = (None, None, None, None, None, None, None, None, None, docketnum)
+        claiminfotoadd.append(plusupdateinfo)
+    else:
+        newclaiminfo = ccbfunctions.claimtypesanddescriptions(soup)
+        plusupdateinfo = (newclaiminfo[0], newclaiminfo[1], newclaiminfo[2], newclaiminfo[3], newclaiminfo[4], newclaiminfo[5], 
+                        newclaiminfo[6], newclaiminfo[7], newclaiminfo[8], docketnum)
+        claiminfotoadd.append(plusupdateinfo)
+        claimantinfoinclaim = ccbfunctions.getclaimantinfo(soup)
+        for claimant in claimantinfoinclaim:
+            plusclaimantupdateinfo = (docketnum, claimant[0], claimant[1], claimant[2], claimant[3], claimant[4],
+                            claimant[5])
+            claimantinfotoadd.append(plusclaimantupdateinfo)
+        print("Getting info about respondents for", docketnum)
+        listofrespondents = ccbfunctions.checkrespondents(docketnum)
+        for respondent in listofrespondents:
+            plusrespupdateinfo = (docketnum, respondent[0], respondent[1], respondent[2], respondent[3])
+            respondentinfotoadd.append(plusrespupdateinfo)
+        if newclaiminfo[1] == 1:
+            worksinfoinclaim = ccbfunctions.getworks(soup)
+            for work in worksinfoinclaim:
+                plusworkupdateinfo = (docketnum, work[0], work[1], work[2], work[3], work[4], work[5], work[6], work[7], work[8])
+                worksinfotoadd.append(plusworkupdateinfo)
 print("Adding info about claim to database")
 cur.executemany('''UPDATE Cases SET SmallerYN = ?, InfringementYN = ?, InfringementDescription = ?, InfringementRelief = ?, 
                 NoninfringementYN = ?, NoninfringementDescription = ?, DmcaYN = ?, DmcaDescription = ?, DmcaRelief = ? 
