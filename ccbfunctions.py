@@ -191,6 +191,29 @@ def checkrespondents(docketnum):
             respondentinfo.append((respname, resprep, respfirm, 1))
     return respondentinfo
 
+# Get info about claimants, from parties page instead of claim, because we've given up on 
+# ever getting a public claim. Returns a list of tuples
+def secondbestclaimantinfo(docketnum):
+    claimantinfo = []
+    partiesurl = 'https://dockets.ccb.gov/case/participants/' + docketnum
+    res = requests.get(partiesurl)
+    res.raise_for_status()
+    soup = bs4.BeautifulSoup(res.text, 'lxml')
+    claimantnamecells = soup.find_all(attrs={'headers' : 'colHeaderParty rowHeaderCLAIMANT'})
+    if len(claimantnamecells) > 0:
+        for claimant in claimantnamecells:
+            claimantname = claimant.parent.contents[1].get_text(strip = True)
+            claimantrep = claimant.parent.contents[3].get_text(strip = True)
+            if len(claimantrep) == 0:
+                claimantrep = None
+            claimantfirm = claimant.parent.contents[5].get_text(strip = True)
+            if len(claimantfirm) == 0:
+                claimantfirm = None
+            elif claimantfirm == "Self-Represented":
+                claimantfirm= None
+            claimantinfo.append((claimantname, claimantrep, claimantfirm))
+    return claimantinfo
+
 #Get information about works described in an infringement claim. Returns list of tuples
 def getworks(infringementclaimsoup):
     listofworks = []

@@ -43,39 +43,107 @@ while moredocstoget == True:
 
 #Start adding claim info to Cases table
 print("Dropping rows with no claim available last time; Adding any new publicly available claim URL info")
-#First remove any rows previously added for cases that didn't have claims yet
-cur.execute("DELETE from Cases WHERE (ClaimAvailableYN=0 AND Status IS NULL)")
+#First remove any rows previously added for cases that didn't have claims yet but we might still get one
+#Find docket rows from Cases with no claim
+claimynisno = []
+cur.execute('''SELECT DocketNumber from Cases WHERE ClaimAvailableYN=0''')
+for row in cur:
+    claimynisno.append(row[0])
+#This is a list of cases where I've manually confirmed we don't need to look for claims anymore
+oldercases = ['22-CCB-0016', '22-CCB-0092', '22-CCB-0096', '22-CCB-0105', '22-CCB-0175', '22-CCB-0211', 
+              '23-CCB-0102', '23-CCB-0177', '23-CCB-0221', '24-CCB-0134', '24-CCB-0186']
+potentialdrops =[]
+for docketnum in claimynisno:
+    if docketnum not in oldercases:
+        potentialdrops.append(docketnum)
+casestodrop = []
+for docketnum in potentialdrops:
+    hasclaimant = False
+    hasrespondent = False
+    cur.execute('''SELECT ClaimantName from Claimants WHERE DocketNumber=?''', (docketnum, ))
+    claimants = cur.fetchall()
+    if len(claimants) > 0:
+        hasclaimant = True
+    cur.execute('''SELECT RespondentName from Respondents WHERE DocketNumber=?''', (docketnum, ))
+    respondents = cur.fetchall()
+    if len(respondents) > 0:
+        hasrespondent = True
+    if hasclaimant or hasrespondent:
+        print("Note: ClaimAvailableYN=0 but Claimant or Respondent found in", docketnum)
+        print("If this is an older case, all is well; else investigate.")
+    else:
+        casestodrop.append(docketnum)
+sql='''DELETE from Cases WHERE DocketNumber in ({seq})'''.format(
+    seq=','.join(['?']*len(casestodrop)))
+cur.execute(sql, casestodrop)
 conn.commit()
+print("Rows dropped because we don't have a claim yet but still might get one:", cur.rowcount)
+
 #Add Docket Number, Claim availability, and Claim URL for cases with publicly available initial claims
-caseswithclaims = []
+print("Looking for new claims")
+caseswithclaimsviacases = set()
+cur.execute('''SELECT DocketNumber FROM Cases WHERE ClaimAvailableYN=1''')
+for row in cur:
+    caseswithclaimsviacases.add(row[0])
+stoplookingforclaims = set()
+cur.execute('''SELECT DocketNumber from Claimants''')
+for row in cur:
+    stoplookingforclaims.add(row[0])
+newcaseswithclaimsviadocs = []
 cur.execute('SELECT DocumentNumber, DocketNumber FROM Documents WHERE DocumentType="Claim" ORDER BY DocketNumber')
 for row in cur:
     docketnum = row[1]
     claimurl = "https://dockets.ccb.gov/claim/view/" + str(row[0])
-    newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None, None)
-    caseswithclaims.append(newclaim)
-cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", caseswithclaims)
+    if docketnum not in caseswithclaimsviacases and docketnum not in stoplookingforclaims:
+        print("Getting info about claim for", docketnum)
+        res = requests.get(claimurl)
+        res.raise_for_status()
+        soup = bs4.BeautifulSoup(res.text, 'lxml')
+        if soup.title.contents[0] == 'Login to eCCB - eCCB':
+            print("Claim not public for docket number", docketnum)
+        else:
+            newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None, None)
+            newcaseswithclaimsviadocs.append(newclaim)
+            caseswithclaimsviacases.add(docketnum)
+cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", newcaseswithclaimsviadocs)
 conn.commit()
 print("Docket Number and URL for", cur.rowcount, "new claims added")
 
 #Add any cases where the initial claim isn't available, but the amended claim is available
-print("Adding documents where initial claim is not available but an amended claim is available")
+print("Looking for dockets where initial claim is not available but an amended claim is available")
 amendedclaimonly = []
 cur.execute("SELECT DocumentNumber, DocketNumber FROM Documents WHERE DocumentType='Amended Claim' ORDER BY FilingDate")
 for row in cur:
     docketnum = row[1]
     claimurl = "https://dockets.ccb.gov/claim/view/" + str(row[0])
-    newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None, None)
-    amendedclaimonly.append(newclaim)
+    if docketnum not in caseswithclaimsviacases:
+        print("Getting info about claim and claimant for", docketnum)
+        res = requests.get(claimurl)
+        res.raise_for_status()
+        soup = bs4.BeautifulSoup(res.text, 'lxml')
+        if soup.title.contents[0] == 'Login to eCCB - eCCB':
+            print("Claim not public for docket number", docketnum)
+        else:
+            newclaim = (docketnum, 1, claimurl, None, None, None, None, None, None, None, None, None, None, None)
+            amendedclaimonly.append(newclaim)
+            caseswithclaimsviacases.add(docketnum)
 cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", amendedclaimonly)
 conn.commit()
 print("Docket Number and URL for", cur.rowcount, "amended-claim-only claims added")
 
-#Add any cases that have documents but no claim or amended claim
+#Add any cases that have documents but no claim or amended claim, and we want to try again next week
+#Also add cases we're going to give up on, but flag them by status ("noclaimdocketsgiveup") so we can grab their parties later
+print("Looking at dockets with no claim or amended claim; checking their status")
 docketswithclaims = set()
 cur.execute('SELECT DocketNumber FROM Cases')
 for row in cur:
     docketswithclaims.add(row[0])
+##Needed to check while building. It's okay that this number is nonzero - these are all the cases that still have no claims
+# checkclaimdockets = docketswithclaims.symmetric_difference(caseswithclaimsviacases)
+# if len(checkclaimdockets) >0:
+#     claimsdifference = len(caseswithclaimsviacases)-len(docketswithclaims)
+#     print("Investigate: caseswithclaimsviacases is longer than docketswithclaims by", claimsdifference)
+#     print(checkclaimdockets)
 noclaimavailableset = set()
 cur.execute('SELECT DocketNumber FROM Documents')
 for row in cur:
@@ -84,12 +152,22 @@ for row in cur:
 noclaimavailable = list(noclaimavailableset)
 noclaimavailable.sort()
 noclaimdockets = []
-for case in noclaimavailable:
-    newrow = (case, 0, None, None, None, None, None, None, None, None, None, None, None, None)
-    noclaimdockets.append(newrow)
+maybestillwaiting = ['Waiting for Review of Amended Claim', 'Waiting for Initial Review', 'In Abeyance', 'Waiting for Amended Claim']
+noclaimdocketsgiveup = set()
+for docketnum in noclaimavailable:
+    cur.execute('''SELECT ClaimantName FROM Claimants WHERE DocketNumber=?''', (docketnum, ))
+    claimants = cur.fetchall()
+    cur.execute('''SELECT RespondentName FROM Respondents WHERE DocketNumber=?''', (docketnum, ))
+    respondents = cur.fetchall()
+    if len(claimants) == 0 and len(respondents) == 0:
+        newrow = (docketnum, 0, None, None, None, None, None, None, None, None, None, None, None, None)
+        noclaimdockets.append(newrow)
+        casestatus = ccbfunctions.getstatus(docketnum, date.today())
+        if casestatus not in maybestillwaiting:
+            noclaimdocketsgiveup.add(docketnum)
 cur.executemany("INSERT OR IGNORE INTO Cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", noclaimdockets)
 conn.commit()
-print(cur.rowcount, "docket numbers added for cases with documents but no claim available")
+print(cur.rowcount, "mostly empty rows added for cases with documents but no claim available")
 
 #Add claim info (case, claimants, respondents, works) for all cases where claims are available and we haven't done that yet
 claiminfotoadd = []
@@ -146,6 +224,28 @@ print("Adding info about works to database")
 cur.executemany('''INSERT INTO Works VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', worksinfotoadd)
 conn.commit()
 print("Works info added for", cur.rowcount, "works")
+
+#Add claimant and respondent info for cases with no available claim and unlikely to ever get one
+#These are cases where we haven't found a puboic claim, but claim is closed or claimant has been directed to serve
+print("Getting claimant and respondent info for cases with no public claims, that have passed claim filing stage")
+claimantinfogivingup = []
+respondentinfogivingup = []
+for docketnum in noclaimdocketsgiveup:
+    listofrespondents = ccbfunctions.checkrespondents(docketnum)
+    for respondent in listofrespondents:
+        plusrespupdateinfo = (docketnum, respondent[0], respondent[1], respondent[2], respondent[3])
+        respondentinfogivingup.append(plusrespupdateinfo)
+    listofclaimants = ccbfunctions.secondbestclaimantinfo(docketnum)
+    for claimant in listofclaimants:
+        plusclaimantupdateinfo = (docketnum, claimant[0], None, None, None, claimant[1], claimant[2])
+        claimantinfogivingup.append(plusclaimantupdateinfo)
+print("Adding info about claimants to database for claimless cases where claims are probably never coming")
+cur.executemany('''INSERT INTO Claimants VALUES (?, ?, ?, ?, ?, ?, ?)''', claimantinfogivingup)
+conn.commit()
+print("Claimant info added for", cur.rowcount, "claimants")
+print("Adding info about respondents to database for claimless cases where claims are probably never coming")
+cur.executemany('''INSERT INTO Respondents VALUES (?, ?, ?, ?, ?)''', respondentinfogivingup)
+conn.commit()
 
 #Add the caption for cases that don't have one yet
 captionsanddockets = []
