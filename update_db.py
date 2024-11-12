@@ -51,7 +51,7 @@ for row in cur:
     claimynisno.append(row[0])
 #This is a list of cases where I've manually confirmed we don't need to look for claims anymore
 oldercases = ['22-CCB-0016', '22-CCB-0092', '22-CCB-0096', '22-CCB-0105', '22-CCB-0175', '22-CCB-0211', 
-              '23-CCB-0102', '23-CCB-0177', '23-CCB-0221', '24-CCB-0134', '24-CCB-0186']
+              '23-CCB-0102', '23-CCB-0177', '23-CCB-0221', '24-CCB-0134']
 potentialdrops =[]
 for docketnum in claimynisno:
     if docketnum not in oldercases:
@@ -226,7 +226,7 @@ conn.commit()
 print("Works info added for", cur.rowcount, "works")
 
 #Add claimant and respondent info for cases with no available claim and unlikely to ever get one
-#These are cases where we haven't found a puboic claim, but claim is closed or claimant has been directed to serve
+#These are cases where we haven't found a public claim, but claim is closed or claimant has been directed to serve
 print("Getting claimant and respondent info for cases with no public claims, that have passed claim filing stage")
 claimantinfogivingup = []
 respondentinfogivingup = []
