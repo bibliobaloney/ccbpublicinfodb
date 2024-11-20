@@ -242,10 +242,11 @@ for docketnum in noclaimdocketsgiveup:
 print("Adding info about claimants to database for claimless cases where claims are probably never coming")
 cur.executemany('''INSERT INTO Claimants VALUES (?, ?, ?, ?, ?, ?, ?)''', claimantinfogivingup)
 conn.commit()
-print("Claimant info added for", cur.rowcount, "claimants")
+print("Bare bones claimant info added for", cur.rowcount, "claimants")
 print("Adding info about respondents to database for claimless cases where claims are probably never coming")
 cur.executemany('''INSERT INTO Respondents VALUES (?, ?, ?, ?, ?)''', respondentinfogivingup)
 conn.commit()
+print("Bare bones respondent info added for", cur.rowcount, "respondents")
 
 #Add the caption for cases that don't have one yet
 captionsanddockets = []
