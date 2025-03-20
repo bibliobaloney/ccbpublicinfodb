@@ -387,6 +387,7 @@ for row in cur:
 newfds = [x for x in allfinaldeterminations if x[1] not in oldfds]
 
 fdsinfolist = []
+fdcurrentcaptions = []
 for fdrow in newfds:
     documentnum = fdrow[1]
     damages = ccbfunctions.getdamages(documentnum)
@@ -394,11 +395,18 @@ for fdrow in newfds:
     print(docketnum, 'Docuement number', documentnum)
     isdefault = ccbfunctions.checkdefault(docketnum)
     fdsinfolist.append((documentnum, isdefault, damages))
+    currentcaption = ccbfunctions.getcaption(docketnum)
+    fdcurrentcaptions.append((currentcaption, docketnum))
 
 print("Adding info about Final Determinations to database")
 cur.executemany('''INSERT OR IGNORE INTO FinalDeterminations VALUES (?, ?, ?)''', fdsinfolist)
 conn.commit()
 print("Final Determination info added for", cur.rowcount, "FDs")
+
+print("Updating captions for cases with new Final Determinations")
+cur.executemany('''UPDATE Cases SET Caption = ? WHERE DocketNumber = ?''', fdcurrentcaptions)
+conn.commit()
+print("Caption updated for", cur.rowcount, "cases")
 
 # Collect and update all the statuses
 # Because trying to exclude dismissed cases keeps giving me cases like 22-CCB-0016 with None status because of 
