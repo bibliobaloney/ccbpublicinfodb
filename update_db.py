@@ -286,7 +286,7 @@ for documentnum in newdismissals:
     ordertext = ordertext.replace('\n', '')
     ordertext = ordertext.replace('  ', ' ')
     settlement = 0
-    if 'settlement' in ordertext:
+    if 'settlement' in ordertext or 'Settlement' in ordertext:
         settlement = 1
     prej = ccbfunctions.checkprejudice(ordertext)
     reasons = ccbfunctions.getdismissalreasons(ordertext)
