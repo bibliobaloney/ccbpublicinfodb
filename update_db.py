@@ -393,7 +393,7 @@ for fdrow in newfds:
     documentnum = fdrow[1]
     damages = ccbfunctions.getdamages(documentnum)
     docketnum = fdrow[0]
-    print(docketnum, 'Docuement number', documentnum)
+    print(docketnum, 'Document number', documentnum)
     isdefault = ccbfunctions.checkdefault(docketnum)
     fdsinfolist.append((documentnum, isdefault, damages))
     currentcaption = ccbfunctions.getcaption(docketnum)
