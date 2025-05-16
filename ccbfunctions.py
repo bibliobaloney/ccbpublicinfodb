@@ -326,7 +326,8 @@ reasonsmenu = {1: "Bad-faith conduct", 2: "Failure to amend", 3: "3 tries and st
                15: "Copyright registration application abandoned", 16: "Service was not valid", 
                17: "No copyright registration or application", 
                18: "Unsuitability: statute of limitations", 19: "Unsuitability: respondent", 
-               20: "Unsuitability: already adjudicated by another court", 21: None}
+               20: "Unsuitability: already adjudicated by another court", 21: "Unsuitability: claim type", 
+               22: None}
 
 # Get a human to read the dismissal order. Returns tuple (HumanRead, WithPrejudice, SettlementMention, Reason1, Reason2)
 def humandismissalinfo(documentnum, ordertext):
@@ -340,7 +341,7 @@ def humandismissalinfo(documentnum, ordertext):
         print(item, reasonsmenu[item])
     reasoninput1 = input('Enter a reason number from the menu: ')
     reason1 = reasonsmenu[int(reasoninput1)]
-    reasoninput2 = input('Enter the second reason if there is one, 21 (None) if not: ')
+    reasoninput2 = input('Enter the second reason if there is one, 22 (None) if not: ')
     reason2 = reasonsmenu[int(reasoninput2)]
     dismissalinfo = (documentnum, 1, prej, settlement, reason1, reason2)
     return dismissalinfo
